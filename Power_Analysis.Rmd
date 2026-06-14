@@ -1,0 +1,167 @@
+---
+title: "HW_Power_Analysis"
+author: "Elizabeth, Ken, Manav, Nancy"
+date: "2026-06-13"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(data.table)
+library(sandwich)
+library(lmtest)
+
+library(ggplot2)
+library(knitr)
+```
+
+```{r}
+library(data.table)
+
+
+### VARY THESE INPUTS (based on different scenarios) ###
+puzzle_mean <- 3 # average time to solve puzzle in minutes
+puzzle_sd <- 5 # standard deviation in puzzle solving time in munites
+ATE_Est <- 2 # average treatment effect in minutes
+ATE_Variation <- 2 # standard deviation of individual treatment effect in minutes
+
+#### SIMULATE FAKE DATA #######
+
+# Create the potential outcomes table
+NROWS <- 300
+
+d <- data.table(
+  id = 1:NROWS
+)
+
+# Create treatment effect (tau) column
+d[ , tau := rnorm(n=.N, mean = ATE_Est, sd = ATE_Variation)]
+print(d)
+
+
+
+# Generate potential outcomes to control - 'no_label' group
+d[ , y_0A_no_label := pmax(0.5, rnorm(n=.N, mean = puzzle_mean, sd = puzzle_sd))]
+
+
+# Generate potential outcomes to control - 'hard_label' group
+### ASSUMED SIMILAR TO 'no_label' GROUP
+d[ , noise := rnorm(n=.N,mean = 0, sd= 1)]
+d[ , y_0B_hard_label := pmax(0, y_0A_no_label +noise)]
+
+# Generate potential outcomes to treatment - 'easy_label' group
+d[ , y_1_easy_label := pmax(0.5, y_0A_no_label +tau)]
+d
+
+#Randomly assign treatment
+equal_group_size <- nrow(d)/3
+
+d[ , treatment := sample(c(rep('no_label',equal_group_size), rep('hard_label',equal_group_size), rep('easy_label', equal_group_size)))]
+d
+
+# Create outcomes vector
+d[ , outcome := fifelse(treatment == 'no_label', y_0A_no_label,
+                        fifelse(
+                          treatment == 'hard_label', y_0B_hard_label, y_1_easy_label)
+                        )]
+
+### FINAL TREATMENT/OUTCOMES TABLE ###
+d <- d[ , .(treatment, outcome)]
+```
+
+
+```{r}
+### RUN 1000 SIMULATIONS TO CAPTURE P VALUE AT DIFF SAMPLE SIZES ####
+# Run sample of a specific percentage size multiple times, store in an object, and do this for several difference percentages of sample
+
+samples_list <- list(.1,.2,.3,.4,.5,.6,.7,.8,.9,1)
+power_list_anova <- list()
+power_list_nolabel_easy <- list()
+
+one_test <- function(d, sample_size) {
+  
+  n_total <- round(nrow(d)*sample_size)
+  n_per_group <- round(n_total/3)
+  d_sample <- d[ , .SD[sample(.N, n_per_group)], by = treatment]
+  
+  d_sample[, treatment := factor(treatment, levels = c('no_label','hard_label', 'easy_label'))]
+  
+  model <- lm(outcome ~ treatment, data = d_sample)
+  
+  c(f_test = anova(model)$'Pr(>F)'[1], 
+    easylabel_no_label = summary(model)$coefficients['treatmenteasy_label', 'Pr(>|t|)']
+  )
+  #summary(model)
+  #t.test(outcome ~ treatment, data = d_sample)$p.value
+}
+
+power_loops <- 1000
+
+for (sample_size in samples_list) {
+  p_values <- replicate(power_loops, one_test(d, sample_size)) 
+  t_test_rejects_anova <- mean(p_values["f_test",] <= 0.05)
+  t_test_rejects_nolabelveasy <- mean(p_values['easylabel_no_label', ] <= 0.05)
+  power_list_anova[[as.character(sample_size)]] <- t_test_rejects_anova
+  power_list_nolabel_easy[[as.character(sample_size)]] <- t_test_rejects_nolabelveasy
+}
+
+power_list_anova 
+power_list_nolabel_easy
+
+
+### PLOT RESULTS ###
+power_results <- rbind(
+  data.frame(
+    sample_size = as.numeric(names(power_list_anova))*nrow(d),
+    power = unlist(power_list_anova),
+    test = 'ANNOVA F-test'
+  ),
+   data.frame(
+    sample_size = as.numeric(names(power_list_nolabel_easy))*nrow(d),
+    power = unlist(power_list_nolabel_easy),
+    test = 'Easy vs No Label'
+  )
+)
+power_results
+
+ggplot(power_results, aes(x = sample_size, y = power, color = test)) +
+  geom_line() +
+  geom_point() +
+  scale_x_continuous(
+    breaks = sort(unique(power_results$sample_size))
+  ) +
+  scale_y_continuous(
+    labels = scales::percent,
+    limits= c(0,1)
+  ) +
+  labs(
+    x = "Sample Size",
+    y = "Power",
+    color = 'Test',
+    title = "Power vs Sample Size"
+  )
+```
+
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
