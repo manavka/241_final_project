@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.4.14)  16 JUN 2026 11:46
+This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.4.14)  16 JUN 2026 13:16
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -459,25 +459,25 @@ Underfull \vbox (badness 10000) detected at line 329
 Underfull \vbox (badness 10000) detected at line 329
  []
 
-[3] [4] [5] [6] [7] [8]
-<Power_Analysis-scenario-1-and-2_files/figure-latex/unnamed-chunk-9-1.pdf, id=63, 469.755pt x 325.215pt>
+[3] [4] [5] [6] [7]
+<Power_Analysis-scenario-1-and-2_files/figure-latex/unnamed-chunk-9-1.pdf, id=59, 469.755pt x 325.215pt>
 File: Power_Analysis-scenario-1-and-2_files/figure-latex/unnamed-chunk-9-1.pdf Graphic file (type pdf)
 <use Power_Analysis-scenario-1-and-2_files/figure-latex/unnamed-chunk-9-1.pdf>
-Package pdftex.def Info: Power_Analysis-scenario-1-and-2_files/figure-latex/unnamed-chunk-9-1.pdf  used on input line 650.
+Package pdftex.def Info: Power_Analysis-scenario-1-and-2_files/figure-latex/unnamed-chunk-9-1.pdf  used on input line 621.
 (pdftex.def)             Requested size: 469.75386pt x 325.2142pt.
-[9 <./Power_Analysis-scenario-1-and-2_files/figure-latex/unnamed-chunk-9-1.pdf>] [10] [11]
-<Power_Analysis-scenario-1-and-2_files/figure-latex/unnamed-chunk-14-1.pdf, id=83, 469.755pt x 325.215pt>
+[8] [9 <./Power_Analysis-scenario-1-and-2_files/figure-latex/unnamed-chunk-9-1.pdf>] [10]
+<Power_Analysis-scenario-1-and-2_files/figure-latex/unnamed-chunk-14-1.pdf, id=79, 469.755pt x 325.215pt>
 File: Power_Analysis-scenario-1-and-2_files/figure-latex/unnamed-chunk-14-1.pdf Graphic file (type pdf)
 <use Power_Analysis-scenario-1-and-2_files/figure-latex/unnamed-chunk-14-1.pdf>
-Package pdftex.def Info: Power_Analysis-scenario-1-and-2_files/figure-latex/unnamed-chunk-14-1.pdf  used on input line 849.
+Package pdftex.def Info: Power_Analysis-scenario-1-and-2_files/figure-latex/unnamed-chunk-14-1.pdf  used on input line 791.
 (pdftex.def)             Requested size: 469.75386pt x 325.2142pt.
-[12] [13 <./Power_Analysis-scenario-1-and-2_files/figure-latex/unnamed-chunk-14-1.pdf>] [14] [15]
-<Power_Analysis-scenario-1-and-2_files/figure-latex/unnamed-chunk-19-1.pdf, id=109, 578.16pt x 397.485pt>
+[11] [12 <./Power_Analysis-scenario-1-and-2_files/figure-latex/unnamed-chunk-14-1.pdf>]
+<Power_Analysis-scenario-1-and-2_files/figure-latex/unnamed-chunk-19-1.pdf, id=94, 578.16pt x 397.485pt>
 File: Power_Analysis-scenario-1-and-2_files/figure-latex/unnamed-chunk-19-1.pdf Graphic file (type pdf)
 <use Power_Analysis-scenario-1-and-2_files/figure-latex/unnamed-chunk-19-1.pdf>
-Package pdftex.def Info: Power_Analysis-scenario-1-and-2_files/figure-latex/unnamed-chunk-19-1.pdf  used on input line 1062.
+Package pdftex.def Info: Power_Analysis-scenario-1-and-2_files/figure-latex/unnamed-chunk-19-1.pdf  used on input line 923.
 (pdftex.def)             Requested size: 578.15858pt x 397.48402pt.
-[16 <./Power_Analysis-scenario-1-and-2_files/figure-latex/unnamed-chunk-19-1.pdf>] [17] (./Power_Analysis-scenario-1-and-2.aux)
+[13] [14] [15 <./Power_Analysis-scenario-1-and-2_files/figure-latex/unnamed-chunk-19-1.pdf>] [16] (./Power_Analysis-scenario-1-and-2.aux)
  ***********
 LaTeX2e <2025-11-01>
 L3 programming layer <2026-03-20>
@@ -487,18 +487,18 @@ LaTeX Warning: There were multiply-defined labels.
 
  ) 
 Here is how much of TeX's memory you used:
- 11774 strings out of 469339
- 183741 string characters out of 5464315
- 605399 words of memory out of 5000000
- 40381 multiletter control sequences out of 15000+600000
+ 11770 strings out of 469339
+ 183707 string characters out of 5464315
+ 605364 words of memory out of 5000000
+ 40379 multiletter control sequences out of 15000+600000
  676967 words of font info for 85 fonts, out of 8000000 for 9000
  14 hyphenation exceptions out of 8191
- 89i,10n,93p,1369b,522s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 89i,10n,93p,1369b,531s stack positions out of 10000i,1000n,20000p,200000b,200000s
 <c:/Users/kenis/AppData/Roaming/TinyTeX/texmf-dist/fonts/type1/public/lm/lmbx10.pfb><c:/Users/kenis/AppData/Roaming/TinyTeX/texmf-dist/fonts/type1/public/lm/lmbx12.pfb><c:/Users/kenis/AppData/Roaming/TinyTeX/texmf-dist/fonts/type1/public/lm/lmmi10.pfb><c:/Users/kenis/AppData/Roaming/TinyTeX/texmf-dist/fonts/type1/public/lm/lmmi7.pfb><c:/Users/kenis/AppData/Roaming/TinyTeX/texmf-dist/fonts/type1/public/lm/lmr10.pfb><c:/Users/kenis/AppData/Roaming/TinyTeX/texmf-dist/fonts/type1/public/lm/lmr12.pfb><c:/Users/kenis/AppData/Roaming/TinyTeX/texmf-dist/fonts/type1/public/lm/lmr17.pfb><c:/Users/kenis/AppData/Roaming/TinyTeX/texmf-dist/fonts/type1/public/lm/lmr7.pfb><c:/Users/kenis/AppData/Roaming/TinyTeX/texmf-dist/fonts/type1/public/lm/lmri10.pfb><c:/Users/kenis/AppData/Roaming/TinyTeX/texmf-dist/fonts/type1/public/lm/lmsy10.pfb><c:/Users/kenis/AppData/Roaming/TinyTeX/texmf-dist/fonts/type1/public/lm/lmsy7.pfb><c:/Users/kenis/AppData/Roaming/TinyTeX/texmf-dist/fonts/type1/public/lm/lmtk10.pfb><c:/Users/kenis/AppData/Roaming/TinyTeX/texmf-dist/fonts/type1/public/lm/lmtt10.pfb><c:/Users/kenis/AppData/Roaming/TinyTeX/texmf-dist/fonts/type1/public/lm/lmtti10.pfb>
-Output written on Power_Analysis-scenario-1-and-2.pdf (17 pages, 340464 bytes).
+Output written on Power_Analysis-scenario-1-and-2.pdf (16 pages, 332615 bytes).
 PDF statistics:
- 246 PDF objects out of 1000 (max. 8388607)
- 187 compressed objects within 2 object streams
- 37 named destinations out of 1000 (max. 500000)
- 80 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 235 PDF objects out of 1000 (max. 8388607)
+ 177 compressed objects within 2 object streams
+ 35 named destinations out of 1000 (max. 500000)
+ 72 words of extra memory for PDF output out of 10000 (max. 10000000)
 
