@@ -129,8 +129,21 @@ function setAdminBadge(on) {
     if (!badge) {
       badge = document.createElement('div');
       badge.id = 'admin-badge';
-      badge.textContent = 'ADMIN';
-      badge.style.cssText = 'position:fixed;bottom:8px;left:8px;z-index:9999;background:#f59e0b;color:#1a0a2e;font-family:monospace;font-size:10px;font-weight:700;padding:3px 7px;border-radius:4px;pointer-events:none;letter-spacing:0.08em;';
+      badge.style.cssText = 'position:fixed;bottom:8px;left:8px;z-index:9999;display:flex;gap:6px;align-items:center;';
+
+      const label = document.createElement('span');
+      label.textContent = 'ADMIN';
+      label.style.cssText = 'background:#f59e0b;color:#1a0a2e;font-family:monospace;font-size:10px;font-weight:700;padding:3px 7px;border-radius:4px;letter-spacing:0.08em;';
+
+      const skipBtn = document.createElement('button');
+      skipBtn.textContent = 'Skip Puzzle';
+      skipBtn.style.cssText = 'background:#ef4444;color:#fff;font-family:monospace;font-size:10px;font-weight:700;padding:3px 7px;border-radius:4px;border:none;cursor:pointer;letter-spacing:0.08em;';
+      skipBtn.addEventListener('click', () => {
+        if (S.r && !S.r.isSolved && !S.r.didSkip) doSkip();
+      });
+
+      badge.appendChild(label);
+      badge.appendChild(skipBtn);
       document.body.appendChild(badge);
     }
   } else {
@@ -1082,7 +1095,9 @@ function renderPuzzle2(box) {
   const gen = genP2Sequence();
   S.r._p2seq = gen.shown;
   S.r._p2answer = gen.answer;
-  S.r._wheelIdx = Math.floor(Math.random() * 26);
+  let startIdx = Math.floor(Math.random() * 26);
+  while (startIdx === S.r._p2answer) startIdx = Math.floor(Math.random() * 26);
+  S.r._wheelIdx = startIdx;
 
   const title = el('p', 'headline', 'What letter comes next?');
   title.style.cssText = 'font-size:22px;text-align:center;color:var(--text-2);';
@@ -2013,7 +2028,8 @@ async function showResults() {
 }
 
 function calcRoundScore(log) {
-  return (log.isSolved ? 100 : 0) + Math.max(0, 500 - log.timeEngaged) - (log.didSkip ? 50 : 0);
+  if (!log.isSolved) return 0;
+  return Math.max(100, 1000 - Math.round(log.timeEngaged));
 }
 
 // ════════════════════════════════════════════════════════════════════
