@@ -59,6 +59,7 @@ Before running regressions, verify the following in Firestore:
 **Known issues**
 - `honestyCheck` may be `null` for all users — the Firestore update call is not yet wired up (TODO in `dataHandler.js`)
 - Failed Firestore writes fall back to `localStorage` as `failedLog_{userId}_{roundNumber}` — these are not recoverable from Firestore
+- `deviceType` detection was updated to use `navigator.userAgent` in addition to viewport width — sessions collected before this fix may misclassify landscape-mode phones as `'Desktop'`
 
 ------------------------------------------------------------------------
 
