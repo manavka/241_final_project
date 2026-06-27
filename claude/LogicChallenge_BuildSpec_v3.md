@@ -1,8 +1,10 @@
 # Logic Pattern Challenge App
-## Full Build Specification — Field Experiment
-**Version 3.1 | Updated June 2026**
 
----
+## Full Build Specification — Field Experiment
+
+**Version 3.1 \| Updated June 2026**
+
+------------------------------------------------------------------------
 
 ## 1. Experiment Overview
 
@@ -10,14 +12,14 @@ A web-based, 5-round pattern-recognition game built for a Field Experiment class
 
 **Research question:** Does priming users with an inaccurate difficulty label (easy vs. hard vs. none) affect persistence, performance, and rage-click behavior on objectively hard logic puzzles?
 
----
+------------------------------------------------------------------------
 
 ## 1.1 Treatment Groups (Independent Variable)
 
 At session start, the user is randomly assigned to one of three groups using `Math.random()`. Assignment is saved to Firestore and persists for all 5 rounds.
 
 | Group ID | Label shown | Where shown | Research intent |
-|---|---|---|---|
+|----|----|----|----|
 | `no_label` | Nothing | N/A — all label UI hidden | Control. Baseline with no priming. |
 | `hard_label` | **DIFFICULTY: HARD** | Label card + centered header throughout round | Accurate priming. Does truthful labeling affect persistence? |
 | `easy_label` | **DIFFICULTY: EASY** | Label card + centered header throughout round | Understated priming. Does false confidence change effort and rage-click rates? |
@@ -30,7 +32,7 @@ At session start, the user is randomly assigned to one of three groups using `Ma
 
 **No-AI reminder:** shown in two places for all groups — on the instructions screen and on every label card: *"🚫 No AI or outside help — it affects our data."*
 
----
+------------------------------------------------------------------------
 
 ## 2. Onboarding & Intro Screen
 
@@ -40,7 +42,7 @@ At session start, the user is randomly assigned to one of three groups using `Ma
 - Lines: "It's giving... genius." / "Prove you've got the logic to match in 5 rapid-fire rounds."
 - CTA: "Start" — narrow pill button, pulsing animation. Leads to consent screen.
 - Background: animated number tiles, SVG polygons, alphabet wheel, sequence rows in top strip, bottom strip, and corners. Center kept clear.
-- Easter eggs: large pink "67" tile top-right (~30% opacity); barely-visible 🐊✈️ and ☕💀 emoji pairs at ~7% opacity.
+- Easter eggs: large pink "67" tile top-right (\~30% opacity); barely-visible 🐊✈️ and ☕💀 emoji pairs at \~7% opacity.
 - `prefers-reduced-motion`: all animations frozen.
 - No data collected on this screen.
 
@@ -49,7 +51,7 @@ At session start, the user is randomly assigned to one of three groups using `Ma
 Shown after "Start." Separate screen, not a modal.
 
 | Element | Copy |
-|---|---|
+|----|----|
 | Headline | "Before we get started 👋" |
 | Body | "Help us understand puzzle game players like you. We have a quick survey… All data is anonymized and used for academic research purposes only." |
 | Fine print | "You can opt out at any point before the game begins. No data is saved until you confirm you're ready to play." |
@@ -63,7 +65,7 @@ No data collected. Opting out returns directly to landing. The "I'd rather not p
 8 questions, one per screen, forward-only. All required before proceeding.
 
 | Field | Input type | Options |
-|---|---|---|
+|----|----|----|
 | Age | Number input | Integer, 13–99 |
 | Education Level | Tap-to-select cards | High school → PhD + Prefer not to say |
 | Field of study/work | Tap-to-select cards | STEM / Social Sciences / Humanities / Business / Arts / Healthcare / Other |
@@ -86,11 +88,11 @@ Progress indicator shows "N of 8." "I'd rather not participate" link (white text
 Shown after survey, before first round. Single screen.
 
 | Element | Copy |
-|---|---|
+|----|----|
 | Headline | "Here's how it works 🧠" |
 | Body | "You'll get 5 logic puzzles, one at a time. Each one has a hidden pattern — your job is to figure out the rule and find the missing piece." |
-| Example 1 | "For example: 2 · 4 · 8 · __ → the rule is ×2, so the answer is 16." |
-| Example 2 | "Or: A · C · E · __ → the rule is +2 letters, so the answer is G." |
+| Example 1 | "For example: 2 · 4 · 8 · \_\_ → the rule is ×2, so the answer is 16." |
+| Example 2 | "Or: A · C · E · \_\_ → the rule is +2 letters, so the answer is G." |
 | Real puzzles note | "The real puzzles are harder than these — but the idea is the same. Find the rule, trust it." |
 | Pro tip | "📝 Pro tip: grab a pen and paper before you start. These will make your brain work." |
 | No-AI note | "🚫 No AI or outside help please — it affects our research data." |
@@ -98,7 +100,7 @@ Shown after survey, before first round. Single screen.
 
 Do NOT mention timer, skip option, or time pressure. This screen does not count toward `timeEngaged`.
 
----
+------------------------------------------------------------------------
 
 ## 3. Data Capture & Treatment Assignment
 
@@ -107,7 +109,7 @@ Triggered by "Start the Challenge" on the instructions screen.
 ### 3.1 Auto-captured fields (users collection)
 
 | Field | How captured |
-|---|---|
+|----|----|
 | `userId` | Firebase Anonymous Auth uid (or `local_` + random string as fallback) |
 | `treatment` | `Math.random()` → one of three groups |
 | `ipAddress` | `https://api.ipify.org?format=json` (best-effort, VPN limitations noted in code) |
@@ -122,21 +124,21 @@ Triggered by "Start the Challenge" on the instructions screen.
 
 ### 3.2 Assignment logic
 
-```js
+``` js
 const r = Math.random();
 const treatment = r < 0.333 ? 'no_label' : r < 0.666 ? 'hard_label' : 'easy_label';
 ```
 
 ### 3.3 Replay detection
 
-```js
+``` js
 const replayKey = 'lpc_played_' + (ipAddress || 'local');
 const isReplay = !!localStorage.getItem(replayKey) || !!localStorage.getItem('lpc_played');
 ```
 
 After session completion: `localStorage.setItem(replayKey, '1')` and `localStorage.setItem('lpc_played', '1')`. On return to landing, full state is reset and a new `userId` is issued so replays are tracked as separate sessions.
 
----
+------------------------------------------------------------------------
 
 ## 4. Puzzle Bank (All 5 Rounds)
 
@@ -152,25 +154,25 @@ On wrong answer, the **Check Answer / Submit Answer button** itself shows the fe
 
 Puzzle-specific behavior (regeneration, chips) is layered on top of this shared feedback.
 
----
+------------------------------------------------------------------------
 
 ### Puzzle 1 — Number Sequence (Free-text input)
 
-| | |
-|---|---|
+|  |  |
+|----|----|
 | **ID** | `puzzle_01` |
 | **Type** | Number sequence |
 | **Rule** | `n_x = (n_{x-1} + n_{x-2}) × 2` |
-| **Shown sequence** | 2, 3, 10, 26, 72, __ |
+| **Shown sequence** | 2, 3, 10, 26, 72, \_\_ |
 | **Answer** | 196 |
 | **Wrong answer UX** | Button shakes red. Struck-through chip added to scrollable history. No regeneration — same sequence stays visible. |
 
----
+------------------------------------------------------------------------
 
 ### Puzzle 2 — Alphabet Sequence (Vertical Slot-Machine Wheel)
 
-| | |
-|---|---|
+|  |  |
+|----|----|
 | **ID** | `puzzle_02` |
 | **Type** | Alphabet / triangular shift |
 | **Rule** | Each letter shifts forward by triangular numbers: +1, +3, +6, +10, +15. Constant across all regenerations. |
@@ -178,12 +180,12 @@ Puzzle-specific behavior (regeneration, chips) is layered on top of this shared 
 | **Interaction** | Vertical slot-machine drum showing A–Z. User scrolls/drags/touch-swipes the drum to select a letter. Wraps in both directions. Starts at a random letter each generation. |
 | **Wrong answer UX** | Button shakes red. After 1.4s button reverts and sequence regenerates with new starting letter (same +1/+3/+6/+10/+15 rule, new answer). No chips — past guesses irrelevant after regeneration. |
 
----
+------------------------------------------------------------------------
 
 ### Puzzle 3 — Shape Sequence (Paint Builder)
 
-| | |
-|---|---|
+|  |  |
+|----|----|
 | **ID** | `puzzle_03` |
 | **Type** | Visual pattern — simultaneous multi-attribute |
 | **Rule** | Three properties cycle independently each step: **Sides** cycle `[3,4,5,6]` (triangle→square→pentagon→hexagon→triangle…); **Rotation** advances +45° each step (0°→45°→90°…→315°→0°); **Color** advances +1 through `[Red, Blue, Green, Yellow, Purple, Orange]`. Each puzzle starts at a random position in each cycle independently. |
@@ -192,12 +194,12 @@ Puzzle-specific behavior (regeneration, chips) is layered on top of this shared 
 | **Wrong answer UX** | Button shakes red. After 1.4s: entire puzzle regenerates (new start positions, same cycling rule), builder resets to default selections. |
 | **Telemetry** | `attemptCount` increments on each wrong submission. `stepsCompleted` = 3 on solve (reflects old 3-step model; kept for schema compatibility). |
 
----
+------------------------------------------------------------------------
 
 ### Puzzle 4 — Hybrid (Free-text input)
 
-| | |
-|---|---|
+|  |  |
+|----|----|
 | **ID** | `puzzle_04` |
 | **Type** | Hybrid — numeric + shape |
 | **Rule** | `value = sides × m` where `m = 4` (fixed). Triangle=3 sides, Square=4, Pentagon=5, Hexagon=6. |
@@ -206,57 +208,50 @@ Puzzle-specific behavior (regeneration, chips) is layered on top of this shared 
 | **Generation** | **Fixed — same puzzle every session.** No regeneration on wrong answer. |
 | **Wrong answer UX** | Button shakes red. Struck-through chip added to scrollable history. Puzzle stays the same. |
 
----
+------------------------------------------------------------------------
 
 ### Puzzle 5 — Tile Sequence (Free-text input)
 
-| | |
-|---|---|
+|  |  |
+|----|----|
 | **ID** | `puzzle_05` |
 | **Type** | Number pattern |
 | **Rule** | `n_x = (n_{x-1} × 3) − n_{x-2}` |
-| **Shown sequence** | 2, 5, 13, 34, __ |
+| **Shown sequence** | 2, 5, 13, 34, \_\_ |
 | **Answer** | 89 |
 | **Wrong answer UX** | Button shakes red. Struck-through chip added to scrollable history. No regeneration. |
 
----
+------------------------------------------------------------------------
 
 ## 5. Game Mechanics
 
 ### 5.1 Round Lifecycle
 
-1. Fisher-Yates shuffle `puzzleBank` at session start. Store order in state.
-2. Show **label card** (5-second animated countdown with pause button and no-AI reminder). Timer not yet running.
-3. Card dismisses → puzzle loads → `timeEngaged` timer starts immediately.
-4. Unlimited attempts. On correct answer: `isSolved = true`, stop timer, log telemetry, show next label card (or results if round 5).
-5. On wrong answer: puzzle-specific behavior (see Section 4).
-6. No hints shown at any time.
+1.  Fisher-Yates shuffle `puzzleBank` at session start. Store order in state.
+2.  Show **label card** (5-second animated countdown with pause button and no-AI reminder). Timer not yet running.
+3.  Card dismisses → puzzle loads → `timeEngaged` timer starts immediately.
+4.  Unlimited attempts. On correct answer: `isSolved = true`, stop timer, log telemetry, show next label card (or results if round 5).
+5.  On wrong answer: puzzle-specific behavior (see Section 4).
+6.  No hints shown at any time.
 
 ### 5.2 Label Card / Between-Round Screen
 
 The label card serves as both the difficulty priming moment and the between-round break screen — there is **no separate between-round countdown screen**.
 
-Label card contains (top to bottom):
-1. "ROUND N of 5" — large display font
-2. "of 5" in muted text
-3. Difficulty badge text (hard/easy groups only)
-4. No-AI reminder: "🚫 No AI or outside help — it affects our data."
-5. Glowing countdown ring counting down from 5 (large number inside ring)
-6. "tap anywhere to skip" hint
-7. **Pause / Take a Break button** — pauses countdown indefinitely, shows "Resume →". Records `breaksTaken` and `totalBreakTime`. Break telemetry written to Firestore after each break ends.
+Label card contains (top to bottom): 1. "ROUND N of 5" — large display font 2. "of 5" in muted text 3. Difficulty badge text (hard/easy groups only) 4. No-AI reminder: "🚫 No AI or outside help — it affects our data." 5. Glowing countdown ring counting down from 5 (large number inside ring) 6. "tap anywhere to skip" hint 7. **Pause / Take a Break button** — pauses countdown indefinitely, shows "Resume →". Records `breaksTaken` and `totalBreakTime`. Break telemetry written to Firestore after each break ends.
 
 ### 5.3 Round Header Layout
 
 The header is a fixed bar at the top of every puzzle screen. Content is constrained to `max-width: 480px` centered within the full-width backdrop bar. Three-column grid layout:
 
 | Left (empty) | Center | Right |
-|---|---|---|
+|----|----|----|
 | Spacer | "DIFFICULTY: HARD" or "DIFFICULTY: EASY" in Bricolage Grotesque 800 18px (red/green glow) — or empty for `no_label` | "ROUND" label + "N / 5" number + 5 pip dots |
 
 ### 5.4 Skip / Quit Mechanics
 
 | Time | Rounds 1–4 | Round 5 |
-|---|---|---|
+|----|----|----|
 | 0–299s | No skip visible | No quit visible |
 | 300s exactly | Pause timer. Full-screen blur + modal: "Keep Going" / "Skip Round" | Same modal: "Keep Going" / "Quit Challenge" |
 | After "Keep Going" | Resume timer. Skip button animates to bottom-right corner aligned with grass edge. Stays until round ends. | Same — "Quit" button to corner |
@@ -271,14 +266,14 @@ Skip/Quit: sets `didSkip = true`, logs telemetry, advances to next round or resu
 - "Keep Going" click: dismiss modal, resume timer, skip button slides to bottom-right corner aligned to right edge of grass (computed via SVG scale math)
 - No pause available once a round has started (label card is the only break point)
 
----
+------------------------------------------------------------------------
 
 ## 6. Anti-Cheat Protections
 
 To maintain data integrity, the following protections are active for all participants:
 
 | Protection | Implementation |
-|---|---|
+|----|----|
 | **Copy/cut blocked** | `document.addEventListener('copy'/'cut', e => e.preventDefault())` |
 | **Paste blocked on inputs** | `document.addEventListener('paste', e => { if (e.target.matches('input')) e.preventDefault() })` |
 | **Right-click disabled** | `document.addEventListener('contextmenu', e => e.preventDefault())` |
@@ -297,21 +292,21 @@ Researchers can toggle all protections off for troubleshooting:
 
 When admin mode is on, copy, paste, right-click, and text selection all work normally.
 
----
+------------------------------------------------------------------------
 
 ## 7. Telemetry & Data Schema
 
 ### 7.1 Firestore Collections
 
-| Collection | Document per | Key fields |
-|---|---|---|
-| `users` | One per session | All fields in Section 3.1 |
-| `gameLogs` | One per round | All fields below |
+| Collection | Document per    | Key fields                |
+|------------|-----------------|---------------------------|
+| `users`    | One per session | All fields in Section 3.1 |
+| `gameLogs` | One per round   | All fields below          |
 
 ### 7.2 gameLogs Schema
 
 | Field | Type | Description |
-|---|---|---|
+|----|----|----|
 | `userId` | String | Reference to users document |
 | `roundNumber` | Int (1–5) | Position in shuffled order |
 | `puzzleId` | String | e.g. `puzzle_03` |
@@ -324,7 +319,7 @@ When admin mode is on, copy, paste, right-click, and text selection all work nor
 | `firstAnswerCorrect` | Boolean \| null | True if first submission was correct |
 | `timeToFirstAttempt` | Float \| null | Seconds from puzzle load to first submission |
 | `keptGoingAfterModal` | Boolean \| null | True=Keep Going, False=Skip/Quit, null=modal never fired |
-| `rageClicks` | Int | Rage-click event count (3+ clicks same element <1s) |
+| `rageClicks` | Int | Rage-click event count (3+ clicks same element \<1s) |
 | `rapidGuesses` | Int | Times 3+ submissions within 8s |
 | `rawSubmissionTimestamps` | Array\<Int\> | Epoch ms of every Check Answer click |
 | `tabSwitchCount` | Int | Times `document.hidden` became true |
@@ -356,13 +351,13 @@ Register `beforeunload` at round start. On tab close mid-round: write partial lo
 
 3+ Check Answer submissions within 8 seconds = one rapid guess event. Increment `rapidGuesses`. Not used in scoring.
 
----
+------------------------------------------------------------------------
 
 ## 8. Scoring & Final Results Screen
 
 ### 8.1 Scoring Formula
 
-```
+```         
 roundScore = (isSolved ? 100 : 0)
            + Math.max(0, 500 - timeEngaged)
            - (didSkip ? 50 : 0)
@@ -387,7 +382,7 @@ Query `gameLogs` for `sessionComplete: true`. Only include users with exactly 5 
 
 Tab-switch detection is disabled on the results screen. Switching away does not trigger a blur overlay or modal.
 
----
+------------------------------------------------------------------------
 
 ## 9. Closing Honesty Check
 
@@ -395,28 +390,28 @@ Shown below score card on results screen. Not gated.
 
 **Question:** "Before you go, one last thing: Did you use any outside help or AI tools to solve these? Seriously — you can be totally honest, we won't get mad!"
 
-| Value | Label |
-|---|---|
-| `solo` | 💯 Solo — all me |
+| Value      | Label                     |
+|------------|---------------------------|
+| `solo`     | 💯 Solo — all me          |
 | `assisted` | I used a little help / AI |
 
 On click: save `honestyCheck` to Firestore, replace buttons with "Thank you! 🙏" message, then after 2.2 seconds reset session state (new `userId`, cleared `S`) and return to landing screen. Next play session will have `isReplay: true`.
 
----
+------------------------------------------------------------------------
 
 ## 10. Visual Design System
 
 ### 10.1 Typography
 
-| Role | Font | Weight |
-|---|---|---|
-| Display / Headlines | Bricolage Grotesque | 800 |
-| Body / UI | Space Grotesk | 400 / 500 / 600 / 700 |
+| Role                | Font                | Weight                |
+|---------------------|---------------------|-----------------------|
+| Display / Headlines | Bricolage Grotesque | 800                   |
+| Body / UI           | Space Grotesk       | 400 / 500 / 600 / 700 |
 
 ### 10.2 Color Palette
 
 | Token | Hex | Usage |
-|---|---|---|
+|----|----|----|
 | Background primary | `#0f0720` | All screens |
 | Background card | `#1e0a3c` / `#160830` gradient | Card surfaces |
 | Background deep | `#0a0015` | Offset shadows |
@@ -439,13 +434,9 @@ On click: save `honestyCheck` to Firestore, replace buttons with "Thank you! �
 
 **Ghost button (`.btn-ghost`):** No background, white border, white text. Used for "I'd rather not participate" and "← Back" on survey. Always full opacity and white.
 
-**Shape SVGs:** All polygon SVGs include a **white dot at the first vertex** (scaled to ~7% of shape size) as a rotation orientation indicator. The dot is omitted on the shape-type selector in Puzzle 3's left toolbar (where rotation is irrelevant) and on Puzzle 4 shapes (rotation irrelevant). The dot IS shown on sequence preview shapes, the live canvas, and rotation picker options.
+**Shape SVGs:** All polygon SVGs include a **white dot at the first vertex** (scaled to \~7% of shape size) as a rotation orientation indicator. The dot is omitted on the shape-type selector in Puzzle 3's left toolbar (where rotation is irrelevant) and on Puzzle 4 shapes (rotation irrelevant). The dot IS shown on sequence preview shapes, the live canvas, and rotation picker options.
 
-**Puzzle 3 paint builder layout:**
-- Left vertical bar: 4 shape tool buttons (shape type selector, no rotation indicator dot)
-- Center: large canvas (max 190px square) showing live shape+color+rotation preview
-- Right vertical bar: 6 color swatches
-- Rotation strip below canvas: 6 buttons showing current shape+color at each candidate angle (with rotation indicator dot)
+**Puzzle 3 paint builder layout:** - Left vertical bar: 4 shape tool buttons (shape type selector, no rotation indicator dot) - Center: large canvas (max 190px square) showing live shape+color+rotation preview - Right vertical bar: 6 color swatches - Rotation strip below canvas: 6 buttons showing current shape+color at each candidate angle (with rotation indicator dot)
 
 ### 10.4 Pixel Scene (Puzzle Screens)
 
@@ -462,13 +453,13 @@ Every puzzle screen has a persistent pixel-art SVG behind the puzzle content (vi
 
 z-index: 0, pointer-events: none. `prefers-reduced-motion`: all animations frozen, llamas placed statically.
 
----
+------------------------------------------------------------------------
 
 ## 11. Technical Architecture
 
 ### 11.1 File Structure
 
-```
+```         
 /claude
 ├── index.html                      Single HTML shell
 ├── style.css                       Global styles — mobile-first
@@ -480,7 +471,7 @@ z-index: 0, pointer-events: none. `prefers-reduced-motion`: all animations froze
 
 ### 11.2 State Object (`S`)
 
-```js
+``` js
 {
   userId,         // string — Firebase uid or local fallback
   treatment,      // 'no_label' | 'hard_label' | 'easy_label'
@@ -502,7 +493,7 @@ z-index: 0, pointer-events: none. `prefers-reduced-motion`: all animations froze
 ### 11.3 Key Functions
 
 | Function | Responsibility |
-|---|---|
+|----|----|
 | `go(renderFn)` | Screen transition — clears `#app`, calls render |
 | `addAnimBg(app)` | Animated background for consent/survey/instructions/countdown |
 | `makePixelScene()` | Returns SVG pixel diorama for puzzle screens |
