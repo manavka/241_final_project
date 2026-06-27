@@ -26,15 +26,18 @@ See `Power_Analysis.Rmd` / `Power_Analysis.pdf` for sample size calculations.
 
 The game app is a vanilla JS single-page app with no build step. It runs directly in any modern browser.
 
-```         
+```
 /claude
 ├── index.html            HTML shell — loads fonts, mounts #app
+├── 404.html              Firebase Hosting 404 page
 ├── style.css             All styles — mobile-first, CSS custom properties
 ├── gameEngine.js         All game logic, state machine, and rendering (~2200 lines)
 ├── dataHandler.js        Firestore reads/writes with localStorage fallback
-├── firebase-config.js    Firebase project config (db = null until wired up)
+├── firebase-config.js    Firebase project config (live — connected to puzzle-project-dd8e0)
 └── LogicChallenge_BuildSpec_v3.md   Full product specification
 ```
+
+The app is deployed via **Firebase Hosting** at **https://anotherpuzzle.io**.
 
 ### Running locally
 
@@ -44,13 +47,17 @@ python3 -m http.server 8080
 # open http://localhost:8080
 ```
 
-No npm, no bundler, no dependencies to install. Firebase is loaded via CDN at runtime and gracefully falls back to localStorage when `db = null`.
+No npm, no bundler, no dependencies to install. Firebase is loaded via CDN at runtime.
 
-### Checking local data (no Firebase)
+### Checking local data
 
 Open DevTools → Application → Local Storage → `http://localhost:8080`
 
-Keys written during a session: - `userData_{userId}` — user doc (survey answers, treatment, etc.) - `gameLog_{userId}_{roundNumber}` — one entry per completed round - `partialLog_{userId}_{roundNumber}` — written on tab close mid-round - `lpc_played` / `lpc_played_{ip}` — replay detection flags
+Keys written during a session:
+- `userData_{userId}` — user doc (survey answers, treatment, etc.)
+- `gameLog_{userId}_{roundNumber}` — one entry per completed round
+- `partialLog_{userId}_{roundNumber}` — written on tab close mid-round
+- `lpc_played` / `lpc_played_{ip}` — replay detection flags
 
 ------------------------------------------------------------------------
 
@@ -70,14 +77,30 @@ Order is randomized per session (Fisher-Yates shuffle).
 
 ## Firebase Setup
 
-The app ships with `db = null` in `firebase-config.js`. To connect a real Firestore:
+Firebase is **live and connected**. The app writes to Firestore project `puzzle-project-dd8e0` and is hosted at `anotherpuzzle.io`.
 
-1.  Create a Firebase project at [console.firebase.google.com](https://console.firebase.google.com)
-2.  Enable **Firestore** and **Anonymous Authentication**
-3.  Replace the config object in `firebase-config.js` with your project's credentials
-4.  Set Firestore rules to allow anonymous writes to `users` and `gameLogs` collections
+| Resource | Value |
+|---|---|
+| Project ID | `puzzle-project-dd8e0` |
+| Auth domain | `anotherpuzzle.io` |
+| Hosting URL | `https://anotherpuzzle.io` |
 
-Until then, all data is stored in the local browser's `localStorage` and nothing is sent anywhere.
+**To deploy updates:**
+
+``` bash
+firebase deploy
+```
+
+**To set up a fresh Firebase project** (if forking):
+
+1. Create a Firebase project at [console.firebase.google.com](https://console.firebase.google.com)
+2. Enable **Firestore** and **Anonymous Authentication**
+3. Replace the config object in `firebase-config.js` with your project's credentials
+4. Set Firestore rules to allow anonymous writes to `users` and `gameLogs` collections
+
+### Non-blocking session start
+
+On "Start Challenge", the app immediately shows the first label card and writes the user doc to Firestore in the background. IP capture uses `api.ipify.org` with a 3-second timeout — if it fails, `ipAddress` is stored as `null` and replay detection falls back to the generic `lpc_played` localStorage flag.
 
 ------------------------------------------------------------------------
 
@@ -87,7 +110,12 @@ To troubleshoot without anti-cheat restrictions getting in the way:
 
 **Press `Shift + Ctrl + A`** anywhere in the app.
 
-An amber **ADMIN** badge appears in the bottom-left corner. Copy, paste, right-click, and text selection all work normally. Press the same shortcut again to re-enable protections. The setting persists across page refreshes.
+An amber **ADMIN** badge appears in the bottom-left corner. In admin mode:
+- Copy, paste, right-click, and text selection all work normally
+- A **Skip** button appears on each puzzle round to advance without solving
+- The alphabet wheel never places the answer in the first position (so even skipping reveals the correct answer visually)
+
+Press the same shortcut again to re-enable protections. The setting persists across page refreshes.
 
 ------------------------------------------------------------------------
 
