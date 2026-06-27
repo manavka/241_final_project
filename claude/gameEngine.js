@@ -763,35 +763,39 @@ async function onStartChallenge() {
   const shuffled = fisherYates([...PUZZLE_BANK]);
   S.puzzleOrder = shuffled.map(p => p.id);
 
-  // ── IP capture (best-effort; VPN/proxy limitations apply) ──
-  try {
-    const res = await fetch('https://api.ipify.org?format=json');
-    const data = await res.json();
-    S.ipAddress = data.ip;
-  } catch { S.ipAddress = null; }
-
-  // ── Replay detection — localStorage keyed by IP (falls back to generic flag) ──
-  const replayKey = 'lpc_played_' + (S.ipAddress || 'local');
-  S.isReplay = !!localStorage.getItem(replayKey) || !!localStorage.getItem('lpc_played');
-
-  // ── Create user document ──
-  const userObj = {
-    userId: S.userId,
-    treatment: S.treatment,
-    ipAddress: S.ipAddress,
-    isReplay: S.isReplay,
-    timestamp: new Date().toISOString(),
-    deviceType: window.innerWidth < 768 ? 'Mobile' : 'Desktop',
-    puzzleOrder: S.puzzleOrder,
-    breaksTaken: 0,
-    totalBreakTime: 0,
-    honestyCheck: null,
-    ...S.surveyAnswers,
-  };
-  await createUser(userObj);
+  // ── Replay detection (IP fetch is best-effort, non-blocking) ──
+  S.isReplay = !!localStorage.getItem('lpc_played');
 
   S.currentRound = 0;
   showLabelCard(0);
+
+  // ── IP capture + user doc write happen in background after UI moves on ──
+  (async () => {
+    try {
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(), 3000);
+      const res = await fetch('https://api.ipify.org?format=json', { signal: controller.signal });
+      S.ipAddress = (await res.json()).ip;
+    } catch { S.ipAddress = null; }
+
+    const replayKey = 'lpc_played_' + (S.ipAddress || 'local');
+    S.isReplay = !!localStorage.getItem(replayKey) || !!localStorage.getItem('lpc_played');
+
+    const userObj = {
+      userId: S.userId,
+      treatment: S.treatment,
+      ipAddress: S.ipAddress,
+      isReplay: S.isReplay,
+      timestamp: new Date().toISOString(),
+      deviceType: window.innerWidth < 768 ? 'Mobile' : 'Desktop',
+      puzzleOrder: S.puzzleOrder,
+      breaksTaken: 0,
+      totalBreakTime: 0,
+      honestyCheck: null,
+      ...S.surveyAnswers,
+    };
+    createUser(userObj);
+  })();
 }
 
 // ════════════════════════════════════════════════════════════════════
