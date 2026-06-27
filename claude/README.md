@@ -22,6 +22,46 @@ See `Power_Analysis.Rmd` / `Power_Analysis.pdf` for sample size calculations.
 
 ------------------------------------------------------------------------
 
+## Data Quality Checks (for analysis)
+
+Before running regressions, verify the following in Firestore:
+
+**Session completeness**
+- Each `userId` with `sessionComplete: true` rounds should have exactly 5 `gameLogs` docs
+- Any `sessionComplete: false` log = dropout → exclude from primary analysis
+- Every `userId` in `gameLogs` must have a matching doc in `users`
+- `treatment` in each `gameLog` must match the `treatment` in the corresponding `users` doc
+
+**Treatment balance**
+- Confirm roughly equal N across `no_label` / `hard_label` / `easy_label`
+- Check balance holds **within** `deviceType` — mobile concentration in one group is a confound
+
+**Survey fields**
+- All 7 fields present and non-null: `age`, `educationLevel`, `quantitativeExposure`, `energyLevel`, `puzzleFrequency`, `puzzleSkill`, `puzzleEnjoyment`
+- `age` in range 13–99; Likert fields integers 1–5
+- Note: `fieldOfStudy` appears in the build spec but is **not implemented** — do not expect it in the data
+
+**Round-level logic**
+- `roundNumber` is 1–5 with no duplicates per user
+- `puzzleId` is one of the 5 expected IDs; must match `puzzleOrder` in the `users` doc
+- `isSolved` and `didSkip` are never both `true`
+- If `timeEngaged > 300`, `keptGoingAfterModal` must not be null
+- `rawSubmissionTimestamps` array length should equal `attemptCount`
+
+**Exclusion flags**
+- `isReplay: true` → exclude from primary analysis (return visitor)
+- Multiple `userId`s sharing the same `ipAddress` → likely same person replaying
+- `rapidGuesses > 0` → flag for low-effort / bot behavior
+- `timeEngaged < 10` on a solved puzzle → flag as suspicious
+- `userId` starting with `local_` → Firebase Auth failed; data is localStorage-only and not in Firestore
+- `deviceType: 'Mobile'` → include but add as covariate; mobile users may have higher `rageClicks` and `tabSwitchCount` due to screen size and OS interruptions
+
+**Known issues**
+- `honestyCheck` may be `null` for all users — the Firestore update call is not yet wired up (TODO in `dataHandler.js`)
+- Failed Firestore writes fall back to `localStorage` as `failedLog_{userId}_{roundNumber}` — these are not recoverable from Firestore
+
+------------------------------------------------------------------------
+
 ## App Overview (`/claude`)
 
 The game app is a vanilla JS single-page app with no build step. It runs directly in any modern browser.
