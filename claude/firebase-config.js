@@ -25,7 +25,13 @@ import { getFirestore } from 'https://www.gstatic.com/firebasejs/10.12.0/firebas
 import { getAuth } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 
 const firebaseConfig = {
-FILL IN
+  apiKey: "AIzaSyCOu5MzRhG-CK_VNnlQj4UkZxQ_QW2lADM",
+  authDomain: "puzzle-project-dd8e0.firebaseapp.com",
+  projectId: "puzzle-project-dd8e0",
+  storageBucket: "puzzle-project-dd8e0.firebasestorage.app",
+  messagingSenderId: "898113113919",
+  appId: "1:898113113919:web:9fb2007acfd78d187a8d8a",
+  measurementId: "G-WS510TFSBE"
 };
 
 const app = initializeApp(firebaseConfig);
