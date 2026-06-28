@@ -14,11 +14,10 @@ Data Quality Verification Checklist
 
 3. Survey Fields
 
-- [x] All 7 survey fields are present and non-null on every users doc: age, educationLevel, quantitativeExposure, energyLevel, puzzleFrequency, puzzleSkill, puzzleEnjoyment
+- [ ] All 8 survey fields are present and non-null on every users doc: age, gender, educationLevel, quantitativeExposure, energyLevel, puzzleFrequency, puzzleSkill, puzzleEnjoyment
 - [x] age is an integer in the range 13–99
 - [x] All Likert fields (quantitativeExposure, energyLevel, puzzleSkill, puzzleEnjoyment) are integers 1–5
-- [x] Card-select fields (educationLevel, puzzleFrequency) contain only the expected option strings — no free-text garbage
-- [ ] Note: The build spec lists fieldOfStudy as a survey field, but it is not implemented in the current code — do not expect it in the data
+- [ ] Card-select fields (gender, educationLevel, puzzleFrequency) contain only the expected option strings — no free-text garbage
 
 4. Round-Level Logic
 
