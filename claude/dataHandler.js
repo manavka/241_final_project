@@ -4,7 +4,7 @@
 import { db, auth } from './firebase-config.js';
 
 // Lazily loaded Firebase modules — only imported when db is non-null
-let _addDoc, _collection, _getDocs, _updateDoc, _doc, _signInAnonymously;
+let _addDoc, _collection, _getDocs, _updateDoc, _doc, _query, _where, _getDoc, _signInAnonymously;
 
 async function loadFirebase() {
   if (!db) return false;
@@ -17,6 +17,9 @@ async function loadFirebase() {
     _getDocs = fs.getDocs;
     _updateDoc = fs.updateDoc;
     _doc = fs.doc;
+    _query = fs.query;
+    _where = fs.where;
+    _getDoc = fs.getDoc; // Note: this is singular, for one doc
     _signInAnonymously = au.signInAnonymously;
     return true;
   } catch {
@@ -66,10 +69,21 @@ export async function updateUserField(userId, fields) {
     localStorage.setItem(key, JSON.stringify({ ...existing, ...fields }));
     return;
   }
-  // updateDoc requires the document reference — userId is the auto-doc id stored separately
-  // For simplicity the caller passes userId which may be the Firestore doc id stored in state
-  // TODO: store the Firestore doc ref at createUser time and pass it here for updateDoc to work
-  // await writeWithRetry(() => _updateDoc(_doc(db, 'users', userId), fields), userId, 'userUpdate');
+  // Because createUser uses addDoc (which auto-generates a document ID),
+  // we can't use the auth `userId` to get a direct document reference.
+  // We must query the collection to find the document where the `userId` field matches.
+  try {
+    const q = _query(_collection(db, 'users'), _where('userId', '==', userId));
+    const querySnapshot = await _getDocs(q);
+    if (!querySnapshot.empty) {
+      const userDocRef = querySnapshot.docs[0].ref;
+      await writeWithRetry(() => _updateDoc(userDocRef, fields), userId, 'userUpdate');
+    } else {
+      console.warn(`Could not find user document for userId: ${userId} to update.`);
+    }
+  } catch (e) {
+    console.error(`Failed to query and update user ${userId}:`, e);
+  }
 }
 
 // ── gameLogs collection ───────────────────────────────────────────────────────
@@ -81,8 +95,6 @@ export async function saveGameLog(logObject) {
     localStorage.setItem(key, JSON.stringify(logObject));
     return;
   }
-  // TODO: import { db } from './firebase-config.js'
-  // TODO: addDoc(collection(db, 'gameLogs'), logObject)
   await writeWithRetry(() => _addDoc(_collection(db, 'gameLogs'), logObject), logObject.userId, logObject.roundNumber);
 }
 
@@ -111,7 +123,7 @@ export async function updateHonestyCheck(userId, value) {
     localStorage.setItem(key, JSON.stringify(existing));
     return;
   }
-  // TODO: updateDoc(doc(db, 'users', userId), { honestyCheck: value })
+  await updateUserField(userId, { honestyCheck: value });
 }
 
 // ── Leaderboard ───────────────────────────────────────────────────────────────
@@ -123,7 +135,6 @@ export async function getLeaderboardScores() {
     return collectLocalScores();
   }
   try {
-    // TODO: getDocs(collection(db, 'gameLogs')) → filter + aggregate
     const snap = await _getDocs(_collection(db, 'gameLogs'));
     const allLogs = snap.docs.map(d => d.data());
     return aggregateScores(allLogs);
