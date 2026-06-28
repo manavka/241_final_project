@@ -763,10 +763,15 @@ async function onStartChallenge() {
   const shuffled = fisherYates([...PUZZLE_BANK]);
   S.puzzleOrder = shuffled.map(p => p.id);
 
-  // ── Replay detection (IP fetch is best-effort, non-blocking) ──
+  // ── Replay detection: a two-stage, non-blocking process ──
+  // Stage 1 (Synchronous): A quick, browser-only check. This provides a baseline
+  // `isReplay` value immediately, so the UI can proceed without waiting.
+  // This value might be updated in Stage 2.
   S.isReplay = !!localStorage.getItem('lpc_played');
 
   S.currentRound = 0;
+  // The game starts immediately. The IP fetch and final replay check happen
+  // in the background. This prioritizes a fast start for the user.
   showLabelCard(0);
 
   // ── IP capture + user doc write happen in background after UI moves on ──
@@ -778,6 +783,11 @@ async function onStartChallenge() {
       S.ipAddress = (await res.json()).ip;
     } catch { S.ipAddress = null; }
 
+    // Stage 2 (Asynchronous): The definitive check. After the IP is fetched,
+    // we re-evaluate `isReplay` using a more reliable IP-based key.
+    // This updated value is used for the main `users` document and for all
+    // subsequent round logs. Note: the very first round log might use the
+    // initial Stage 1 value if it's saved before this async block completes.
     const replayKey = 'lpc_played_' + (S.ipAddress || 'local');
     S.isReplay = !!localStorage.getItem(replayKey) || !!localStorage.getItem('lpc_played');
 
@@ -1047,6 +1057,7 @@ function showPuzzle(roundIdx) {
     timerStart();
     setupTabSwitch(app);
     registerBeforeUnload();
+    setupRageClickTracking(app);
   });
 }
 
@@ -1671,6 +1682,11 @@ function onCorrect() {
   if (checkBtn) btnFeedback(checkBtn, true, '');
   setTimeout(() => {
     const isLast = S.currentRound === 4;
+    // Clean up rage click listener
+    if (_rageClickHandler) {
+      document.body.removeEventListener('click', _rageClickHandler, true);
+      _rageClickHandler = null;
+    }
     if (isLast) showResults();
     else showLabelCard(S.currentRound + 1);
   }, 1200);
@@ -1853,6 +1869,11 @@ function doSkip() {
   S.r.didSkip = true;
   timerStop();
   logRound(true);
+  // Clean up rage click listener
+  if (_rageClickHandler) {
+    document.body.removeEventListener('click', _rageClickHandler, true);
+    _rageClickHandler = null;
+  }
   const isLast = S.currentRound === 4;
   if (isLast) showResults();
   else showLabelCard(S.currentRound + 1);
@@ -1861,6 +1882,24 @@ function doSkip() {
 // ════════════════════════════════════════════════════════════════════
 // RAGE CLICK
 // ════════════════════════════════════════════════════════════════════
+
+let _rageClickHandler = null;
+
+function setupRageClickTracking(app) {
+  // Clean up previous listener if it exists
+  if (_rageClickHandler) {
+    document.body.removeEventListener('click', _rageClickHandler);
+  }
+
+  _rageClickHandler = (e) => {
+    if (!S.r) return;
+    // Create a simple key for the element, e.g., 'BUTTON.btn-check' or 'DIV#p3-canvas'
+    const key = e.target.tagName + (e.target.id ? `#${e.target.id}` : '') + (e.target.className ? `.${e.target.className.split(' ').join('.')}` : '');
+    trackClick(key, Date.now());
+  };
+
+  document.body.addEventListener('click', _rageClickHandler, true); // Use capture to get all clicks
+}
 
 function trackClick(key, ts) {
   if (!S.r._clickMap[key]) S.r._clickMap[key] = [];
