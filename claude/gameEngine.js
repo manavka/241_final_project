@@ -26,6 +26,8 @@ const PUZZLE_BANK = [
 
 const SURVEY_QUESTIONS = [
   { id:'age', label:'How old are you?', type:'number', min:13, max:99 },
+  { id:'gender', label:'What is your gender?', type:'cards',
+    options:['Male', 'Female', 'Non-binary', 'Other'] },
   { id:'educationLevel', label:'What is your highest level of education?', type:'cards',
     options:['Still in high school','High school diploma or GED','Vocational or trade school','Some college (no degree)','Associate\'s degree','Bachelor\'s degree','Master\'s degree','PhD or doctoral degree','Prefer not to say'] },
   { id:'quantitativeExposure', label:'How often do you work with numbers, statistics, or logic?', type:'likert', min:1, max:5, lo:'Never', hi:'All the time' },
