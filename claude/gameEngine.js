@@ -1057,6 +1057,7 @@ function showPuzzle(roundIdx) {
     timerStart();
     setupTabSwitch(app);
     registerBeforeUnload();
+    setupRageClickTracking(app);
   });
 }
 
@@ -1681,6 +1682,11 @@ function onCorrect() {
   if (checkBtn) btnFeedback(checkBtn, true, '');
   setTimeout(() => {
     const isLast = S.currentRound === 4;
+    // Clean up rage click listener
+    if (_rageClickHandler) {
+      document.body.removeEventListener('click', _rageClickHandler, true);
+      _rageClickHandler = null;
+    }
     if (isLast) showResults();
     else showLabelCard(S.currentRound + 1);
   }, 1200);
@@ -1863,6 +1869,11 @@ function doSkip() {
   S.r.didSkip = true;
   timerStop();
   logRound(true);
+  // Clean up rage click listener
+  if (_rageClickHandler) {
+    document.body.removeEventListener('click', _rageClickHandler, true);
+    _rageClickHandler = null;
+  }
   const isLast = S.currentRound === 4;
   if (isLast) showResults();
   else showLabelCard(S.currentRound + 1);
@@ -1871,6 +1882,24 @@ function doSkip() {
 // ════════════════════════════════════════════════════════════════════
 // RAGE CLICK
 // ════════════════════════════════════════════════════════════════════
+
+let _rageClickHandler = null;
+
+function setupRageClickTracking(app) {
+  // Clean up previous listener if it exists
+  if (_rageClickHandler) {
+    document.body.removeEventListener('click', _rageClickHandler);
+  }
+
+  _rageClickHandler = (e) => {
+    if (!S.r) return;
+    // Create a simple key for the element, e.g., 'BUTTON.btn-check' or 'DIV#p3-canvas'
+    const key = e.target.tagName + (e.target.id ? `#${e.target.id}` : '') + (e.target.className ? `.${e.target.className.split(' ').join('.')}` : '');
+    trackClick(key, Date.now());
+  };
+
+  document.body.addEventListener('click', _rageClickHandler, true); // Use capture to get all clicks
+}
 
 function trackClick(key, ts) {
   if (!S.r._clickMap[key]) S.r._clickMap[key] = [];
