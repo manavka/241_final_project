@@ -763,10 +763,15 @@ async function onStartChallenge() {
   const shuffled = fisherYates([...PUZZLE_BANK]);
   S.puzzleOrder = shuffled.map(p => p.id);
 
-  // ── Replay detection (IP fetch is best-effort, non-blocking) ──
+  // ── Replay detection: a two-stage, non-blocking process ──
+  // Stage 1 (Synchronous): A quick, browser-only check. This provides a baseline
+  // `isReplay` value immediately, so the UI can proceed without waiting.
+  // This value might be updated in Stage 2.
   S.isReplay = !!localStorage.getItem('lpc_played');
 
   S.currentRound = 0;
+  // The game starts immediately. The IP fetch and final replay check happen
+  // in the background. This prioritizes a fast start for the user.
   showLabelCard(0);
 
   // ── IP capture + user doc write happen in background after UI moves on ──
@@ -778,6 +783,11 @@ async function onStartChallenge() {
       S.ipAddress = (await res.json()).ip;
     } catch { S.ipAddress = null; }
 
+    // Stage 2 (Asynchronous): The definitive check. After the IP is fetched,
+    // we re-evaluate `isReplay` using a more reliable IP-based key.
+    // This updated value is used for the main `users` document and for all
+    // subsequent round logs. Note: the very first round log might use the
+    // initial Stage 1 value if it's saved before this async block completes.
     const replayKey = 'lpc_played_' + (S.ipAddress || 'local');
     S.isReplay = !!localStorage.getItem(replayKey) || !!localStorage.getItem('lpc_played');
 
