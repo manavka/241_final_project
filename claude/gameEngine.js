@@ -4,6 +4,7 @@ import { signInAnon, createUser, saveGameLog, savePartialLog, updateHonestyCheck
 // CONSTANTS
 // ════════════════════════════════════════════════════════════════════
 
+const SKIP_MODAL_TIMEOUT_SECONDS = 180; // 3 minutes
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 const COLORS_CYCLE = ['Red', 'Blue', 'Green', 'Yellow', 'Purple'];
 const COLOR_HEX = { Red:'#ef4444', Blue:'#3b82f6', Green:'#22c55e', Yellow:'#eab308', Purple:'#a855f7', Orange:'#f97316' };
@@ -94,7 +95,7 @@ function makeRound(puzzleId) {
     isSolved: false,
     didSkip: false,
     keptGoingAfterModal: null,
-    _modalFired: false,
+    _skipModalFired: false,
     // puzzle 2
     _p2seq: null,
     _p2answer: null,
@@ -109,7 +110,6 @@ function makeRound(puzzleId) {
     // rapid guess
     _subTimestamps: [],
     // 300s modal / corner button
-    _300fired: false,
     _cornerShown: false,
     // break tracking
     _breakStart: null,
@@ -1705,8 +1705,8 @@ function timerStart() {
     S.r.timeEngaged = S.r._timerAccum + Math.floor((Date.now() - S.r._timerLastStart) / 1000);
     const timerEl = document.getElementById('timer');
     if (timerEl) timerEl.textContent = formatTime(S.r.timeEngaged);
-    if (!S.r._300fired && S.r.timeEngaged >= 300) {
-      S.r._300fired = true;
+    if (!S.r._skipModalFired && S.r.timeEngaged >= SKIP_MODAL_TIMEOUT_SECONDS) {
+      S.r._skipModalFired = true;
       showSkipModal();
     }
   }, 500);
@@ -1937,7 +1937,7 @@ async function logRound(sessionComplete) {
     rawSubmissionTimestamps: S.r.rawSubmissionTimestamps,
     tabSwitchCount: S.r.tabSwitchCount,
     tabSwitchTimePaused: parseFloat(S.r.tabSwitchTimePaused.toFixed(2)),
-    modalTimePaused: S.r._300fired ? parseFloat(S.r.modalTimePaused.toFixed(2)) : null,
+    modalTimePaused: S.r._skipModalFired ? parseFloat(S.r.modalTimePaused.toFixed(2)) : null,
     treatment: S.treatment,
     isReplay: S.isReplay,
   };
