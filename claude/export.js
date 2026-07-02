@@ -10,7 +10,7 @@ console.log('Connecting to Firestore...');
 backups(firestore, ['users', 'gameLogs'])
   .then((data) => {
     // 3. Write the extracted data to a local file
-    fs.writeFileSync('firestore_export.json', JSON.stringify(data, null, 2));
+    fs.writeFileSync('data_pipeline/firestore_export.json', JSON.stringify(data, null, 2));
     console.log('✅ Export successfully completed! Saved as firestore_export.json');
   })
   .catch((error) => {

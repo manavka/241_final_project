@@ -1,0 +1,81 @@
+---
+title: "firestore_preprocessing"
+author: "Ken Isaka"
+date: "2026-07-02"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+Data preprocessing of .json file from firestore
+```{r cars}
+# 1. Install required packages (uncomment and run if you don't have them yet)
+# install.packages(c("jsonlite", "dplyr", "tidyr", "purrr"))
+
+# Load the libraries
+library(jsonlite)
+library(dplyr)
+library(tidyr)
+library(purrr)
+
+# 2. Load the Raw JSON Data
+# We use simplifyVector = FALSE to keep the raw list structure intact initially.
+# This prevents jsonlite from trying (and failing) to force irregular arrays into matrices.
+cat("Loading data from data_pipeline/firestore_export.json...\n")
+# You need to change the path is we move the .json file and/or the preprocessing
+raw_data <- fromJSON("firestore_export.json", simplifyVector = FALSE)
+
+# 2. Flatten the Users Collection
+# Notice we are accessing raw_data$users directly now
+users_df <- tibble(
+  document_id = names(raw_data$users),
+  data = raw_data$users
+) %>%
+  unnest_wider(data) 
+
+# 3. Flatten the GameLogs Collection
+gamelogs_df <- tibble(
+  document_id = names(raw_data$gameLogs),
+  data = raw_data$gameLogs
+) %>%
+  unnest_wider(data)
+
+# 4. Join into the Master Dataset
+experiment_master <- gamelogs_df %>%
+  # Drop treatment and isReplay from gameLogs before joining 
+  # so we don't get duplicate '.x' and '.y' columns
+  select(-treatment, -isReplay) %>% 
+  left_join(users_df, by = "userId") %>%
+  # Drop the Firestore document IDs as they aren't needed for analysis
+  select(-starts_with("document_id"))
+
+# 5. Verify the data types and structure
+glimpse(experiment_master)
+View(experiment_master)
+```
+
+## Including Plots
+
+Check for randomization frequencies
+
+```{r pressure, echo=FALSE}
+# 1. Randomization / Balance Check
+cat("--- Covariate Balance --- \n")
+balance_check <- experiment_master %>%
+  # We only need one row per user to check demographics, not one per round
+  distinct(userId, .keep_all = TRUE) %>%
+  group_by(treatment) %>%
+  summarize(
+    n_users = n(),
+    avg_age = mean(age, na.rm = TRUE),
+    avg_quant_exposure = mean(quantitativeExposure, na.rm = TRUE),
+    avg_puzzle_skill = mean(puzzleSkill, na.rm = TRUE)
+  )
+print(balance_check)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
