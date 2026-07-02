@@ -67,3 +67,12 @@ node_modules/
 
 # dataconnect generated files
 .dataconnect
+
+# Firebase Service Account Credentials
+credentials.json
+
+# Exported Data (optional, but good if you want to keep participant data private)
+firestore_export.json
+
+# Node modules
+node_modules/
