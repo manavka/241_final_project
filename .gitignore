@@ -68,11 +68,12 @@ node_modules/
 # dataconnect generated files
 .dataconnect
 
-# Firebase Service Account Credentials
+# Hide credentials in the root folder
 credentials.json
 
-# Exported Data (optional, but good if you want to keep participant data private)
-firestore_export.json
+# Hide the export data in its new folder
+data_pipeline/firestore_export.json
 
-# Node modules
+# Hide node modules
 node_modules/
+claude/node_modules/
