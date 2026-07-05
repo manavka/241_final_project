@@ -37,9 +37,9 @@ Before running regressions, verify the following in Firestore:
 - Check balance holds **within** `deviceType` — mobile concentration in one group is a confound
 
 **Survey fields**
-- All 7 fields present and non-null: `age`, `educationLevel`, `quantitativeExposure`, `energyLevel`, `puzzleFrequency`, `puzzleSkill`, `puzzleEnjoyment`
+- All 8 fields present and non-null: `age`, `gender`, `educationLevel`, `quantitativeExposure`, `energyLevel`, `puzzleFrequency`, `puzzleSkill`, `puzzleEnjoyment`
 - `age` in range 13–99; Likert fields integers 1–5
-- Note: `fieldOfStudy` appears in the build spec but is **not implemented** — do not expect it in the data
+- Card-select fields (`gender`, `educationLevel`, `puzzleFrequency`) contain only the expected option strings.
 
 **Round-level logic**
 - `roundNumber` is 1–5 with no duplicates per user
