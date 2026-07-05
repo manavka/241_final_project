@@ -813,7 +813,7 @@ async function onStartChallenge() {
 function showLabelCard(roundIdx) {
   const roundNum = roundIdx + 1;
   const treatment = S.treatment;
-  let seconds = 5;
+  let seconds = 10;
   let _interval = null;
   let _dismissed = false;
   let _paused = false;
