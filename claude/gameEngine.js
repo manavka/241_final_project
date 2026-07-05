@@ -1042,22 +1042,16 @@ function showPuzzle(roundIdx) {
     skipCorner.id = 'corner-skip';
     skipCorner.disabled = true;
     skipCorner.title = 'Skip will be available shortly';
-    skipCorner.style.cssText = 'opacity:0.35;pointer-events:none;cursor:default;background:rgba(124,58,237,0.25);color:var(--lavender);box-shadow:none;margin-top:4px;';
+    skipCorner.style.cssText = 'opacity:0.6;pointer-events:none;cursor:default;background:rgba(124,58,237,0.35);color:var(--lavender);box-shadow:2px 3px 0 rgba(76,29,149,0.4);margin-top:4px;border:1.5px solid rgba(167,139,250,0.4);';
     skipCorner.addEventListener('click', () => { if (S.r._skipEnabled) doSkip(); });
 
-    // Toast for touch devices (title attr doesn't show on mobile)
-    skipCorner.addEventListener('touchstart', () => {
-      if (S.r._skipEnabled) return;
-      if (document.getElementById('skip-tip')) return;
-      const t = el('div');
-      t.id = 'skip-tip';
-      t.textContent = 'Skip will be available shortly';
-      t.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(30,10,60,0.95);color:#c4b5fd;font-family:"Space Grotesk",sans-serif;font-size:13px;padding:8px 14px;border-radius:10px;pointer-events:none;z-index:999;white-space:nowrap;';
-      document.getElementById('app').appendChild(t);
-      setTimeout(() => t.remove(), 2000);
-    }, { passive: true });
+    const skipNote = el('p');
+    skipNote.id = 'skip-note';
+    skipNote.textContent = '⏳ Skip unlocks after 30 seconds — hang tight!';
+    skipNote.style.cssText = 'font-family:"Space Grotesk",sans-serif;font-size:12px;color:rgba(167,139,250,0.7);text-align:center;margin-top:2px;';
 
     puzBox.appendChild(skipCorner);
+    puzBox.appendChild(skipNote);
 
     timerStart();
     setupTabSwitch(app);
@@ -1717,6 +1711,8 @@ function timerStart() {
         skipCorner.disabled = false;
         skipCorner.removeAttribute('title');
         skipCorner.style.cssText = 'margin-top:4px;';
+        const note = document.getElementById('skip-note');
+        if (note) note.remove();
       }
     }
   }, 500);
