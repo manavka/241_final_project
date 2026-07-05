@@ -2011,7 +2011,7 @@ async function showResults() {
 
 function calcRoundScore(log) {
   if (!log.isSolved) return 0;
-  return Math.max(100, 1000 - Math.round(log.timeEngaged));
+  return 50 + Math.max(0, 50 - Math.floor(log.timeEngaged / 6));
 }
 
 // ════════════════════════════════════════════════════════════════════

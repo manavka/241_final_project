@@ -180,7 +180,8 @@ function collectLocalScores() {
 }
 
 function calcRoundScore(log) {
-  return (log.isSolved ? 100 : 0) + Math.max(0, 500 - log.timeEngaged) - (log.didSkip ? 50 : 0);
+  if (!log.isSolved) return 0;
+  return 50 + Math.max(0, 50 - Math.floor(log.timeEngaged / 6));
 }
 
 // ── Retry / error handling ────────────────────────────────────────────────────
