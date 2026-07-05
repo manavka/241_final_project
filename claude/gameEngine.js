@@ -1051,7 +1051,7 @@ function showPuzzle(roundIdx) {
     skipCorner.disabled = true;
     skipCorner.title = 'Skip will be available shortly';
     skipCorner.style.cssText = 'opacity:0.35;pointer-events:none;cursor:default;background:rgba(124,58,237,0.25);color:var(--lavender);box-shadow:none;margin-top:4px;';
-    skipCorner.addEventListener('click', () => doSkip());
+    skipCorner.addEventListener('click', () => { if (S.r._skipEnabled) doSkip(); });
 
     // Toast for touch devices (title attr doesn't show on mobile)
     skipCorner.addEventListener('touchstart', () => {
