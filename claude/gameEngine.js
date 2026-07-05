@@ -871,16 +871,10 @@ function showLabelCard(roundIdx) {
     app.appendChild(center);
 
     // Countdown logic
-    function onTap(e) {
-      if (_paused) return;
-      if (pauseBtn.contains(e.target)) return;
-      dismiss();
-    }
     function dismiss() {
       if (_dismissed) return;
       _dismissed = true;
       clearInterval(_interval);
-      app.removeEventListener('click', onTap);
       showPuzzle(roundIdx);
     }
 
@@ -897,7 +891,6 @@ function showLabelCard(roundIdx) {
       if (seconds <= 0) {
         clearInterval(_interval);
         _dismissed = true;
-        app.removeEventListener('click', onTap);
         setTimeout(() => showPuzzle(roundIdx), 450);
       }
     }, 1000);
@@ -920,7 +913,6 @@ function showLabelCard(roundIdx) {
       }
     });
 
-    setTimeout(() => app.addEventListener('click', onTap), 1000);
   });
 }
 
