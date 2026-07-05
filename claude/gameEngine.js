@@ -868,12 +868,6 @@ function showLabelCard(roundIdx) {
     pauseBtn.textContent = 'Take a Break ⏸';
     center.appendChild(pauseBtn);
 
-    // Tap-to-skip hint — fully visible
-    const skipHint = el('p');
-    skipHint.style.cssText = 'font-family:"Space Grotesk",sans-serif;font-size:15px;font-weight:500;color:var(--text);transition:opacity 0.2s;';
-    skipHint.textContent = 'tap anywhere to skip';
-    center.appendChild(skipHint);
-
     app.appendChild(center);
 
     // Countdown logic
@@ -917,14 +911,12 @@ function showLabelCard(roundIdx) {
         pauseBtn.textContent = 'Resume →';
         pauseBtn.style.borderColor = 'rgba(167,139,250,0.70)';
         pauseBtn.style.color = 'var(--text)';
-        skipHint.style.opacity = '0.35';
       } else {
         _paused = false;
         if (_breakStart) { S.totalBreakTime += (Date.now() - _breakStart) / 1000; _breakStart = null; }
         pauseBtn.textContent = 'Take a Break ⏸';
         pauseBtn.style.borderColor = 'rgba(167,139,250,0.35)';
         pauseBtn.style.color = 'var(--lavender)';
-        skipHint.style.opacity = '1';
       }
     });
 
@@ -1052,40 +1044,28 @@ function showPuzzle(roundIdx) {
       case 'tile_sequence':   renderPuzzle5(puzBox, puzzle); break;
     }
 
-    // ── Skip/Quit button — visible immediately, enabled after 30s ──
+    // ── Skip/Quit button — below check button, enabled after 30s ──
     const isLast = S.currentRound === 4;
-    const skipCorner = el('button', 'skip-corner', isLast ? 'Quit' : 'Skip');
+    const skipCorner = el('button', 'btn-check', isLast ? 'Quit Challenge' : 'Skip Round');
     skipCorner.id = 'corner-skip';
     skipCorner.disabled = true;
     skipCorner.title = 'Skip will be available shortly';
-    skipCorner.style.opacity = '0.35';
-    skipCorner.style.pointerEvents = 'none';
-    skipCorner.style.cursor = 'default';
+    skipCorner.style.cssText = 'opacity:0.35;pointer-events:none;cursor:default;background:rgba(124,58,237,0.25);color:var(--lavender);box-shadow:none;margin-top:4px;';
+    skipCorner.addEventListener('click', () => doSkip());
 
-    const sceneH = window.innerHeight - HDR_H;
-    const svgScale = Math.min(window.innerWidth / 580, sceneH / 520);
-    const svgTopInViewport = HDR_H + (sceneH - 520 * svgScale) / 2;
-    const grassTopInViewport = svgTopInViewport + 472 * svgScale;
-    skipCorner.style.bottom = Math.max(16, window.innerHeight - grassTopInViewport + 12) + 'px';
-    skipCorner.style.right = Math.max(0, (window.innerWidth - 580 * svgScale) / 2) + 12 + 'px';
-
-    skipCorner.addEventListener('click', () => { skipCorner.remove(); doSkip(); });
-
-    // Tooltip for touch devices (title attr doesn't fire on mobile)
+    // Toast for touch devices (title attr doesn't show on mobile)
     skipCorner.addEventListener('touchstart', () => {
-      if (!S.r._skipEnabled) {
-        const tip = document.getElementById('skip-tip');
-        if (tip) return;
-        const t = el('div');
-        t.id = 'skip-tip';
-        t.textContent = 'Skip will be available shortly';
-        t.style.cssText = 'position:fixed;bottom:' + (parseInt(skipCorner.style.bottom) + 44) + 'px;right:' + skipCorner.style.right + ';background:rgba(30,10,60,0.95);color:#c4b5fd;font-family:"Space Grotesk",sans-serif;font-size:12px;padding:6px 10px;border-radius:8px;pointer-events:none;z-index:999;white-space:nowrap;';
-        document.getElementById('app').appendChild(t);
-        setTimeout(() => t.remove(), 2000);
-      }
+      if (S.r._skipEnabled) return;
+      if (document.getElementById('skip-tip')) return;
+      const t = el('div');
+      t.id = 'skip-tip';
+      t.textContent = 'Skip will be available shortly';
+      t.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(30,10,60,0.95);color:#c4b5fd;font-family:"Space Grotesk",sans-serif;font-size:13px;padding:8px 14px;border-radius:10px;pointer-events:none;z-index:999;white-space:nowrap;';
+      document.getElementById('app').appendChild(t);
+      setTimeout(() => t.remove(), 2000);
     }, { passive: true });
 
-    app.appendChild(skipCorner);
+    puzBox.appendChild(skipCorner);
 
     timerStart();
     setupTabSwitch(app);
@@ -1743,10 +1723,8 @@ function timerStart() {
       const skipCorner = document.getElementById('corner-skip');
       if (skipCorner) {
         skipCorner.disabled = false;
-        skipCorner.style.opacity = '1';
-        skipCorner.style.pointerEvents = 'auto';
-        skipCorner.style.cursor = 'pointer';
-        skipCorner.title = '';
+        skipCorner.removeAttribute('title');
+        skipCorner.style.cssText = 'margin-top:4px;';
       }
     }
   }, 500);
@@ -1814,7 +1792,7 @@ function setupTabSwitch(app) {
         <p class="headline" style="font-size:24px;margin-bottom:10px;">Stay focused! 👀</p>
         <p class="body-text" style="font-size:15px;margin-bottom:14px;">The challenge is paused while you're away.</p>
         <p class="body-text" style="font-size:14px;color:#f87171;font-weight:600;margin-bottom:10px;">🚫 No AI or outside help — it affects our research data.</p>
-        <p class="body-text" style="font-size:13px;color:rgba(196,181,253,0.7);line-height:1.5;">If you're stuck, use the <strong style="color:var(--text-2);">Skip</strong> button in the bottom-right corner.</p>
+        <p class="body-text" style="font-size:13px;color:rgba(196,181,253,0.7);line-height:1.5;">If you're stuck, use the <strong style="color:var(--text-2);">Skip</strong> button to proceed to the next round.</p>
       </div>`;
     document.getElementById('app').appendChild(ov);
   }
