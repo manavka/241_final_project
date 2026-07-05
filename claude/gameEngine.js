@@ -4,7 +4,7 @@ import { signInAnon, createUser, saveGameLog, savePartialLog, updateHonestyCheck
 // CONSTANTS
 // ════════════════════════════════════════════════════════════════════
 
-const SKIP_MODAL_TIMEOUT_SECONDS = 180; // 3 minutes
+const SKIP_ENABLE_SECONDS = 30;
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 const COLORS_CYCLE = ['Red', 'Blue', 'Green', 'Yellow', 'Purple'];
 const COLOR_HEX = { Red:'#ef4444', Blue:'#3b82f6', Green:'#22c55e', Yellow:'#eab308', Purple:'#a855f7', Orange:'#f97316' };
@@ -92,12 +92,9 @@ function makeRound(puzzleId) {
     tabSwitchCount: 0,
     tabSwitchTimePaused: 0,
     _tabPauseStart: null,
-    modalTimePaused: 0,
-    _modalPauseStart: null,
     isSolved: false,
     didSkip: false,
-    keptGoingAfterModal: null,
-    _skipModalFired: false,
+    _skipEnabled: false,
     // puzzle 2
     _p2seq: null,
     _p2answer: null,
@@ -111,8 +108,7 @@ function makeRound(puzzleId) {
     _clickMap: {},   // elementKey -> [timestamps]
     // rapid guess
     _subTimestamps: [],
-    // 300s modal / corner button
-    _cornerShown: false,
+    // skip button
     // break tracking
     _breakStart: null,
   };
@@ -1056,6 +1052,41 @@ function showPuzzle(roundIdx) {
       case 'tile_sequence':   renderPuzzle5(puzBox, puzzle); break;
     }
 
+    // ── Skip/Quit button — visible immediately, enabled after 30s ──
+    const isLast = S.currentRound === 4;
+    const skipCorner = el('button', 'skip-corner', isLast ? 'Quit' : 'Skip');
+    skipCorner.id = 'corner-skip';
+    skipCorner.disabled = true;
+    skipCorner.title = 'Skip will be available shortly';
+    skipCorner.style.opacity = '0.35';
+    skipCorner.style.pointerEvents = 'none';
+    skipCorner.style.cursor = 'default';
+
+    const sceneH = window.innerHeight - HDR_H;
+    const svgScale = Math.min(window.innerWidth / 580, sceneH / 520);
+    const svgTopInViewport = HDR_H + (sceneH - 520 * svgScale) / 2;
+    const grassTopInViewport = svgTopInViewport + 472 * svgScale;
+    skipCorner.style.bottom = Math.max(16, window.innerHeight - grassTopInViewport + 12) + 'px';
+    skipCorner.style.right = Math.max(0, (window.innerWidth - 580 * svgScale) / 2) + 12 + 'px';
+
+    skipCorner.addEventListener('click', () => { skipCorner.remove(); doSkip(); });
+
+    // Tooltip for touch devices (title attr doesn't fire on mobile)
+    skipCorner.addEventListener('touchstart', () => {
+      if (!S.r._skipEnabled) {
+        const tip = document.getElementById('skip-tip');
+        if (tip) return;
+        const t = el('div');
+        t.id = 'skip-tip';
+        t.textContent = 'Skip will be available shortly';
+        t.style.cssText = 'position:fixed;bottom:' + (parseInt(skipCorner.style.bottom) + 44) + 'px;right:' + skipCorner.style.right + ';background:rgba(30,10,60,0.95);color:#c4b5fd;font-family:"Space Grotesk",sans-serif;font-size:12px;padding:6px 10px;border-radius:8px;pointer-events:none;z-index:999;white-space:nowrap;';
+        document.getElementById('app').appendChild(t);
+        setTimeout(() => t.remove(), 2000);
+      }
+    }, { passive: true });
+
+    app.appendChild(skipCorner);
+
     timerStart();
     setupTabSwitch(app);
     registerBeforeUnload();
@@ -1707,9 +1738,16 @@ function timerStart() {
     S.r.timeEngaged = S.r._timerAccum + Math.floor((Date.now() - S.r._timerLastStart) / 1000);
     const timerEl = document.getElementById('timer');
     if (timerEl) timerEl.textContent = formatTime(S.r.timeEngaged);
-    if (!S.r._skipModalFired && S.r.timeEngaged >= SKIP_MODAL_TIMEOUT_SECONDS) {
-      S.r._skipModalFired = true;
-      showSkipModal();
+    if (!S.r._skipEnabled && S.r.timeEngaged >= SKIP_ENABLE_SECONDS) {
+      S.r._skipEnabled = true;
+      const skipCorner = document.getElementById('corner-skip');
+      if (skipCorner) {
+        skipCorner.disabled = false;
+        skipCorner.style.opacity = '1';
+        skipCorner.style.pointerEvents = 'auto';
+        skipCorner.style.cursor = 'pointer';
+        skipCorner.title = '';
+      }
     }
   }, 500);
 }
@@ -1722,7 +1760,6 @@ function timerPause(reason) {
     S.r._timerLastStart = null;
   }
   if (reason === 'tab') S.r._tabPauseStart = Date.now();
-  if (reason === 'modal') S.r._modalPauseStart = Date.now();
 }
 
 function timerResume(reason) {
@@ -1732,10 +1769,6 @@ function timerResume(reason) {
   if (reason === 'tab' && S.r._tabPauseStart) {
     S.r.tabSwitchTimePaused += (Date.now() - S.r._tabPauseStart) / 1000;
     S.r._tabPauseStart = null;
-  }
-  if (reason === 'modal' && S.r._modalPauseStart) {
-    S.r.modalTimePaused += (Date.now() - S.r._modalPauseStart) / 1000;
-    S.r._modalPauseStart = null;
   }
 }
 
@@ -1781,7 +1814,7 @@ function setupTabSwitch(app) {
         <p class="headline" style="font-size:24px;margin-bottom:10px;">Stay focused! 👀</p>
         <p class="body-text" style="font-size:15px;margin-bottom:14px;">The challenge is paused while you're away.</p>
         <p class="body-text" style="font-size:14px;color:#f87171;font-weight:600;margin-bottom:10px;">🚫 No AI or outside help — it affects our research data.</p>
-        <p class="body-text" style="font-size:13px;color:rgba(196,181,253,0.7);line-height:1.5;">If you're stuck, hang in there — a <strong style="color:var(--text-2);">Skip</strong> option will become available shortly.</p>
+        <p class="body-text" style="font-size:13px;color:rgba(196,181,253,0.7);line-height:1.5;">If you're stuck, use the <strong style="color:var(--text-2);">Skip</strong> button in the bottom-right corner.</p>
       </div>`;
     document.getElementById('app').appendChild(ov);
   }
@@ -1803,68 +1836,6 @@ function setupTabSwitch(app) {
   document.addEventListener('visibilitychange', _tabHandler);
   window.addEventListener('blur', _blurHandler);
   window.addEventListener('focus', _focusHandler);
-}
-
-// ════════════════════════════════════════════════════════════════════
-// SKIP / QUIT MODAL
-// ════════════════════════════════════════════════════════════════════
-
-function showSkipModal() {
-  timerPause('modal');
-  const isLast = S.currentRound === 4;
-  const ov = el('div', 'overlay');
-  ov.id = 'skip-overlay';
-  const card = el('div', 'modal-card');
-  card.innerHTML = `
-    <h2 class="headline" style="font-size:22px;margin-bottom:12px;">${isLast ? 'Last round — you\'ve got this.' : 'Feeling stuck?'}</h2>
-    <p class="body-text" style="font-size:15px;margin-bottom:24px;">${isLast ? 'You can quit the challenge or keep pushing!' : 'You can skip this round or keep going!'}</p>
-  `;
-  const keepBtn = el('button', 'btn-check', 'Keep Going');
-  keepBtn.style.width = '100%'; keepBtn.style.marginBottom = '12px';
-  keepBtn.addEventListener('click', () => {
-    S.r.keptGoingAfterModal = true;
-    ov.remove();
-    timerResume('modal');
-    // Animate skip button into corner
-    showCornerSkipBtn();
-  });
-  const skipBtn = el('button', 'btn-link', isLast ? 'Quit Challenge' : 'Skip Round');
-  skipBtn.style.display = 'block'; skipBtn.style.width = '100%';
-  skipBtn.addEventListener('click', () => {
-    S.r.keptGoingAfterModal = false;
-    ov.remove();
-    doSkip();
-  });
-  card.appendChild(keepBtn); card.appendChild(skipBtn);
-  ov.appendChild(card);
-  document.getElementById('app').appendChild(ov);
-}
-
-function showCornerSkipBtn() {
-  if (S.r._cornerShown) return;
-  S.r._cornerShown = true;
-  const isLast = S.currentRound === 4;
-  const btn = el('button', 'skip-corner animating-in', isLast ? 'Quit' : 'Skip');
-  btn.id = 'corner-skip';
-
-  // Vertical: compute grass position — SVG viewBox 0 0 580 520, grass tops at y≈472
-  const sceneH = window.innerHeight - 58;
-  const svgScale = Math.min(window.innerWidth / 580, sceneH / 520);
-  const svgRenderH = 520 * svgScale;
-  const svgTopInViewport = 58 + (sceneH - svgRenderH) / 2;
-  const grassTopInViewport = svgTopInViewport + 472 * svgScale;
-  const fromBottom = window.innerHeight - grassTopInViewport;
-  btn.style.bottom = Math.max(16, fromBottom + 12) + 'px'; // 12px above grass
-
-  // Horizontal: align to right edge of the grass (SVG right edge, centered with meet scaling)
-  const grassRightFromScreenRight = Math.max(0, (window.innerWidth - 580 * svgScale) / 2);
-  btn.style.right = (grassRightFromScreenRight + 12) + 'px';
-
-  btn.addEventListener('click', () => {
-    btn.remove();
-    doSkip();
-  });
-  document.getElementById('app').appendChild(btn);
 }
 
 function doSkip() {
@@ -1933,13 +1904,13 @@ async function logRound(sessionComplete) {
     stepsCompleted: puzzle.type === 'shape_sequence' ? S.r.stepsCompleted : null,
     firstAnswerCorrect: S.r.firstAnswerCorrect,
     timeToFirstAttempt: S.r.timeToFirstAttempt,
-    keptGoingAfterModal: S.r.keptGoingAfterModal,
+    keptGoingAfterModal: null,
     rageClicks: S.r.rageClicks,
     rapidGuesses: S.r.rapidGuesses,
     rawSubmissionTimestamps: S.r.rawSubmissionTimestamps,
     tabSwitchCount: S.r.tabSwitchCount,
     tabSwitchTimePaused: parseFloat(S.r.tabSwitchTimePaused.toFixed(2)),
-    modalTimePaused: S.r._skipModalFired ? parseFloat(S.r.modalTimePaused.toFixed(2)) : null,
+    modalTimePaused: null,
     treatment: S.treatment,
     isReplay: S.isReplay,
   };
