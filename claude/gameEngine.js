@@ -1145,6 +1145,9 @@ function renderPuzzle2(box) {
         const newGen = genP2Sequence();
         S.r._p2seq = newGen.shown;
         S.r._p2answer = newGen.answer;
+        let newIdx = Math.floor(Math.random() * 26);
+        while (newIdx === S.r._p2answer) newIdx = Math.floor(Math.random() * 26);
+        S.r._wheelIdx = newIdx;
         const seqD = document.getElementById('p2seq');
         if (seqD) renderP2Sequence(seqD);
         const ww = document.getElementById('wheel-wrap');
