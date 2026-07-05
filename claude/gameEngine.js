@@ -4,6 +4,7 @@ import { signInAnon, createUser, saveGameLog, savePartialLog, updateHonestyCheck
 // CONSTANTS
 // ════════════════════════════════════════════════════════════════════
 
+const SKIP_MODAL_TIMEOUT_SECONDS = 180; // 3 minutes
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 const COLORS_CYCLE = ['Red', 'Blue', 'Green', 'Yellow', 'Purple'];
 const COLOR_HEX = { Red:'#ef4444', Blue:'#3b82f6', Green:'#22c55e', Yellow:'#eab308', Purple:'#a855f7', Orange:'#f97316' };
@@ -25,6 +26,8 @@ const PUZZLE_BANK = [
 
 const SURVEY_QUESTIONS = [
   { id:'age', label:'How old are you?', type:'number', min:13, max:99 },
+  { id:'gender', label:'What is your gender?', type:'cards',
+    options:['Male', 'Female', 'Non-binary', 'Other'] },
   { id:'educationLevel', label:'What is your highest level of education?', type:'cards',
     options:['Still in high school','High school diploma or GED','Vocational or trade school','Some college (no degree)','Associate\'s degree','Bachelor\'s degree','Master\'s degree','PhD or doctoral degree','Prefer not to say'] },
   { id:'quantitativeExposure', label:'How often do you work with numbers, statistics, or logic?', type:'likert', min:1, max:5, lo:'Never', hi:'All the time' },
@@ -94,7 +97,7 @@ function makeRound(puzzleId) {
     isSolved: false,
     didSkip: false,
     keptGoingAfterModal: null,
-    _modalFired: false,
+    _skipModalFired: false,
     // puzzle 2
     _p2seq: null,
     _p2answer: null,
@@ -109,7 +112,6 @@ function makeRound(puzzleId) {
     // rapid guess
     _subTimestamps: [],
     // 300s modal / corner button
-    _300fired: false,
     _cornerShown: false,
     // break tracking
     _breakStart: null,
@@ -763,10 +765,15 @@ async function onStartChallenge() {
   const shuffled = fisherYates([...PUZZLE_BANK]);
   S.puzzleOrder = shuffled.map(p => p.id);
 
-  // ── Replay detection (IP fetch is best-effort, non-blocking) ──
+  // ── Replay detection: a two-stage, non-blocking process ──
+  // Stage 1 (Synchronous): A quick, browser-only check. This provides a baseline
+  // `isReplay` value immediately, so the UI can proceed without waiting.
+  // This value might be updated in Stage 2.
   S.isReplay = !!localStorage.getItem('lpc_played');
 
   S.currentRound = 0;
+  // The game starts immediately. The IP fetch and final replay check happen
+  // in the background. This prioritizes a fast start for the user.
   showLabelCard(0);
 
   // ── IP capture + user doc write happen in background after UI moves on ──
@@ -778,6 +785,11 @@ async function onStartChallenge() {
       S.ipAddress = (await res.json()).ip;
     } catch { S.ipAddress = null; }
 
+    // Stage 2 (Asynchronous): The definitive check. After the IP is fetched,
+    // we re-evaluate `isReplay` using a more reliable IP-based key.
+    // This updated value is used for the main `users` document and for all
+    // subsequent round logs. Note: the very first round log might use the
+    // initial Stage 1 value if it's saved before this async block completes.
     const replayKey = 'lpc_played_' + (S.ipAddress || 'local');
     S.isReplay = !!localStorage.getItem(replayKey) || !!localStorage.getItem('lpc_played');
 
@@ -1047,6 +1059,7 @@ function showPuzzle(roundIdx) {
     timerStart();
     setupTabSwitch(app);
     registerBeforeUnload();
+    setupRageClickTracking(app);
   });
 }
 
@@ -1671,6 +1684,11 @@ function onCorrect() {
   if (checkBtn) btnFeedback(checkBtn, true, '');
   setTimeout(() => {
     const isLast = S.currentRound === 4;
+    // Clean up rage click listener
+    if (_rageClickHandler) {
+      document.body.removeEventListener('click', _rageClickHandler, true);
+      _rageClickHandler = null;
+    }
     if (isLast) showResults();
     else showLabelCard(S.currentRound + 1);
   }, 1200);
@@ -1689,8 +1707,8 @@ function timerStart() {
     S.r.timeEngaged = S.r._timerAccum + Math.floor((Date.now() - S.r._timerLastStart) / 1000);
     const timerEl = document.getElementById('timer');
     if (timerEl) timerEl.textContent = formatTime(S.r.timeEngaged);
-    if (!S.r._300fired && S.r.timeEngaged >= 300) {
-      S.r._300fired = true;
+    if (!S.r._skipModalFired && S.r.timeEngaged >= SKIP_MODAL_TIMEOUT_SECONDS) {
+      S.r._skipModalFired = true;
       showSkipModal();
     }
   }, 500);
@@ -1853,6 +1871,11 @@ function doSkip() {
   S.r.didSkip = true;
   timerStop();
   logRound(true);
+  // Clean up rage click listener
+  if (_rageClickHandler) {
+    document.body.removeEventListener('click', _rageClickHandler, true);
+    _rageClickHandler = null;
+  }
   const isLast = S.currentRound === 4;
   if (isLast) showResults();
   else showLabelCard(S.currentRound + 1);
@@ -1861,6 +1884,24 @@ function doSkip() {
 // ════════════════════════════════════════════════════════════════════
 // RAGE CLICK
 // ════════════════════════════════════════════════════════════════════
+
+let _rageClickHandler = null;
+
+function setupRageClickTracking(app) {
+  // Clean up previous listener if it exists
+  if (_rageClickHandler) {
+    document.body.removeEventListener('click', _rageClickHandler);
+  }
+
+  _rageClickHandler = (e) => {
+    if (!S.r) return;
+    // Create a simple key for the element, e.g., 'BUTTON.btn-check' or 'DIV#p3-canvas'
+    const key = e.target.tagName + (e.target.id ? `#${e.target.id}` : '') + (e.target.className ? `.${e.target.className.split(' ').join('.')}` : '');
+    trackClick(key, Date.now());
+  };
+
+  document.body.addEventListener('click', _rageClickHandler, true); // Use capture to get all clicks
+}
 
 function trackClick(key, ts) {
   if (!S.r._clickMap[key]) S.r._clickMap[key] = [];
@@ -1898,7 +1939,7 @@ async function logRound(sessionComplete) {
     rawSubmissionTimestamps: S.r.rawSubmissionTimestamps,
     tabSwitchCount: S.r.tabSwitchCount,
     tabSwitchTimePaused: parseFloat(S.r.tabSwitchTimePaused.toFixed(2)),
-    modalTimePaused: S.r._300fired ? parseFloat(S.r.modalTimePaused.toFixed(2)) : null,
+    modalTimePaused: S.r._skipModalFired ? parseFloat(S.r.modalTimePaused.toFixed(2)) : null,
     treatment: S.treatment,
     isReplay: S.isReplay,
   };
