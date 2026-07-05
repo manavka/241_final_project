@@ -67,8 +67,8 @@ No data collected. Opting out returns directly to landing. The "I'd rather not p
 | Field | Input type | Options |
 |----|----|----|
 | Age | Number input | Integer, 13–99 |
+| Gender | Tap-to-select cards | Male / Female / Non-binary / Other |
 | Education Level | Tap-to-select cards | High school → PhD + Prefer not to say |
-| Field of study/work | Tap-to-select cards | STEM / Social Sciences / Humanities / Business / Arts / Healthcare / Other |
 | Quantitative exposure | Likert 1–5 | 1 = Never → 5 = All the time |
 | Energy Level | Likert 1–5 | 1 = Exhausted → 5 = Fully energized |
 | Puzzle frequency | Tap-to-select cards | Never / A few times a year / Monthly / Weekly / Daily |
@@ -120,7 +120,7 @@ Triggered by "Start the Challenge" on the instructions screen.
 | `breaksTaken` | Int, updated incrementally |
 | `totalBreakTime` | Float (seconds), updated incrementally |
 | `honestyCheck` | `null` until closing check answered |
-| Survey fields | `age`, `educationLevel`, `fieldOfStudy`, `quantitativeExposure`, `energyLevel`, `puzzleFrequency`, `puzzleSkill`, `puzzleEnjoyment` |
+| Survey fields | `age`, `gender`, `educationLevel`, `quantitativeExposure`, `energyLevel`, `puzzleFrequency`, `puzzleSkill`, `puzzleEnjoyment` |
 
 ### 3.2 Assignment logic
 
