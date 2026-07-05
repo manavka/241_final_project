@@ -1048,7 +1048,7 @@ function showPuzzle(roundIdx) {
     const skipNote = el('p');
     skipNote.id = 'skip-note';
     skipNote.textContent = '⏳ Skip will unlock shortly — hang tight!';
-    skipNote.style.cssText = 'font-family:"Space Grotesk",sans-serif;font-size:12px;color:#ffffff;text-align:center;margin-top:2px;';
+    skipNote.style.cssText = 'font-family:"Space Grotesk",sans-serif;font-size:14px;color:#ffffff;text-align:center;margin-top:2px;';
 
     puzBox.appendChild(skipCorner);
     puzBox.appendChild(skipNote);
