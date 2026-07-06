@@ -83,7 +83,6 @@ function makeRound(puzzleId) {
     _timerPaused: false,
     _timerLastStart: null,
     attemptCount: 0,
-    stepsCompleted: 0,
     firstAnswerCorrect: null,
     timeToFirstAttempt: null,
     rageClicks: 0,
@@ -1490,7 +1489,7 @@ function renderPuzzle3(box) {
     if (S.r.timeToFirstAttempt === null) S.r.timeToFirstAttempt = S.r.timeEngaged;
 
     if (sel.sides === ans.sides && sel.color === ans.color && sel.rotation === ans.rotation) {
-      S.r.stepsCompleted = 3; onCorrect();
+      onCorrect();
     } else {
       btnFeedback(submitBtn, false, 'Submit Answer');
       setTimeout(() => {
@@ -1870,16 +1869,13 @@ async function logRound(sessionComplete) {
     didSkip: S.r.didSkip,
     sessionComplete,
     attemptCount: S.r.attemptCount,
-    stepsCompleted: puzzle.type === 'shape_sequence' ? S.r.stepsCompleted : null,
     firstAnswerCorrect: S.r.firstAnswerCorrect,
     timeToFirstAttempt: S.r.timeToFirstAttempt,
-    keptGoingAfterModal: null,
     rageClicks: S.r.rageClicks,
     rapidGuesses: S.r.rapidGuesses,
     rawSubmissionTimestamps: S.r.rawSubmissionTimestamps,
     tabSwitchCount: S.r.tabSwitchCount,
     tabSwitchTimePaused: parseFloat(S.r.tabSwitchTimePaused.toFixed(2)),
-    modalTimePaused: null,
     treatment: S.treatment,
     isReplay: S.isReplay,
   };
