@@ -45,7 +45,6 @@ Before running regressions, verify the following in Firestore:
 - `roundNumber` is 1–5 with no duplicates per user
 - `puzzleId` is one of the 5 expected IDs; must match `puzzleOrder` in the `users` doc
 - `isSolved` and `didSkip` are never both `true`
-- If `timeEngaged > 300`, `keptGoingAfterModal` must not be null
 - `rawSubmissionTimestamps` array length should equal `attemptCount`
 
 **Exclusion flags**
@@ -78,7 +77,7 @@ The game app is a vanilla JS single-page app with no build step. It runs directl
 └── LogicChallenge_BuildSpec_v3.md   Full product specification
 ```
 
-The app is deployed via **Firebase Hosting** at **https://anotherpuzzle.io**.
+The app is deployed via **Firebase Hosting** at **https://anotherpuzzle.io** and mirrored on **GitHub Pages** at **https://manavka.github.io/241_final_project/** (for use on networks that block the primary domain).
 
 ### Running locally
 
@@ -123,13 +122,17 @@ Firebase is **live and connected**. The app writes to Firestore project `puzzle-
 | Resource | Value |
 |---|---|
 | Project ID | `puzzle-project-dd8e0` |
-| Auth domain | `anotherpuzzle.io` |
-| Hosting URL | `https://anotherpuzzle.io` |
+| Auth domain | `puzzle-project-dd8e0.firebaseapp.com` |
+| Primary URL | `https://anotherpuzzle.io` |
+| Mirror URL | `https://manavka.github.io/241_final_project/` |
+
+Both URLs are authorized domains in Firebase Auth and write to the same Firestore database.
 
 **To deploy updates:**
 
 ``` bash
-firebase deploy
+firebase deploy        # deploys to anotherpuzzle.io
+git push               # triggers GitHub Actions → deploys to GitHub Pages
 ```
 
 **To set up a fresh Firebase project** (if forking):
