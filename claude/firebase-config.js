@@ -26,7 +26,7 @@ import { getAuth } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-aut
 
 const firebaseConfig = {
   apiKey: "AIzaSyCOu5MzRhG-CK_VNnlQj4UkZxQ_QW2lADM",
-  authDomain: "anotherpuzzle.io",
+  authDomain: "puzzle-project-dd8e0.firebaseapp.com",
   projectId: "puzzle-project-dd8e0",
   storageBucket: "puzzle-project-dd8e0.firebasestorage.app",
   messagingSenderId: "898113113919",
