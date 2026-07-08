@@ -123,9 +123,10 @@ function isAdminMode() { return !!localStorage.getItem('lpc_admin'); }
 // ── Draft session persistence ──
 function saveDraft() {
   localStorage.setItem('lpc_draft', JSON.stringify({
-    treatment:     S.treatment,
-    surveyAnswers: S.surveyAnswers,
-    surveyPage:    S.surveyPage,
+    treatment:    S.treatment,
+    userId:       S.userId       || null,
+    puzzleOrder:  S.puzzleOrder  || [],
+    currentRound: S.currentRound || 0,
   }));
 }
 function clearDraft() { localStorage.removeItem('lpc_draft'); }
@@ -547,12 +548,19 @@ function showConsent() {
 
     const btn = makeBtn('I understand — let\'s go', () => {
       const saved = localStorage.getItem('lpc_draft');
-      if (saved) {
-        showWelcomeBack(JSON.parse(saved));
+      const draft = saved ? JSON.parse(saved) : null;
+      if (draft && draft.currentRound > 0) {
+        // Left mid-game — show welcome back
+        showWelcomeBack(draft);
       } else {
-        const r = Math.random();
-        S.treatment = r < 0.333 ? 'no_label' : r < 0.666 ? 'hard_label' : 'easy_label';
-        saveDraft();
+        // No draft or left before game started — assign/restore treatment and start survey fresh
+        if (draft) {
+          S.treatment = draft.treatment;
+        } else {
+          const r = Math.random();
+          S.treatment = r < 0.333 ? 'no_label' : r < 0.666 ? 'hard_label' : 'easy_label';
+          saveDraft();
+        }
         const hasPlayed = !!localStorage.getItem('lpc_played');
         hasPlayed ? showReplayCheck() : showSurvey(0);
       }
@@ -587,16 +595,13 @@ function showWelcomeBack(draft) {
     qLabel.style.cssText = 'font-size:clamp(20px,5vw,26px);line-height:1.3;color:#e2d9f3;margin-bottom:10px;';
     inner.appendChild(qLabel);
 
-    const answered = Object.keys(draft.surveyAnswers).length;
-    const sub = el('p', '', `You left off on question ${draft.surveyPage + 1} of ${SURVEY_QUESTIONS.length}. Want to continue where you left off?`);
+    const sub = el('p', '', `You completed ${draft.currentRound} of 5 puzzles last time. You'll need to fill out the survey again, then you'll pick up from puzzle ${draft.currentRound + 1}.`);
     sub.style.cssText = 'font-family:"Space Grotesk",sans-serif;font-size:15px;color:#c4b5fd;margin-bottom:28px;line-height:1.6;';
     inner.appendChild(sub);
 
     const continueBtn = makeBtn('Continue where I left off', () => {
-      S.treatment     = draft.treatment;
-      S.surveyAnswers = draft.surveyAnswers;
-      S.surveyPage    = draft.surveyPage;
-      showSurvey(draft.surveyPage);
+      S.treatment = draft.treatment;
+      showSurvey(0);
     });
     continueBtn.style.marginBottom = '12px';
     inner.appendChild(continueBtn);
@@ -790,8 +795,6 @@ function showSurvey(idx) {
         return;
       }
       S.surveyAnswers[q.id] = val;
-      S.surveyPage = idx + 1;
-      saveDraft();
       idx < total - 1 ? showSurvey(idx + 1) : showInstructions();
     });
     nextBtn.style.marginBottom = '10px';
@@ -901,20 +904,28 @@ async function onStartChallenge() {
     S.treatment = r < 0.333 ? 'no_label' : r < 0.666 ? 'hard_label' : 'easy_label';
   }
 
-  // ── Puzzle shuffle ──
-  const shuffled = fisherYates([...PUZZLE_BANK]);
-  S.puzzleOrder = shuffled.map(p => p.id);
+  const draft = (() => { try { return JSON.parse(localStorage.getItem('lpc_draft')); } catch { return null; } })();
+  const resuming = draft && draft.currentRound > 0 && draft.userId && draft.puzzleOrder?.length;
 
-  // ── Replay detection: a two-stage, non-blocking process ──
-  // Stage 1 (Synchronous): A quick, browser-only check. This provides a baseline
-  // `isReplay` value immediately, so the UI can proceed without waiting.
-  // This value might be updated in Stage 2.
+  if (resuming) {
+    // Restore saved game state so round logs share the same userId
+    S.userId       = draft.userId;
+    S.puzzleOrder  = draft.puzzleOrder;
+    S.currentRound = draft.currentRound;
+  } else {
+    // Fresh game — shuffle puzzles and start from round 0
+    const shuffled = fisherYates([...PUZZLE_BANK]);
+    S.puzzleOrder  = shuffled.map(p => p.id);
+    S.currentRound = 0;
+  }
+
+  // ── Replay detection ──
   S.isReplay = !!localStorage.getItem('lpc_played');
 
-  S.currentRound = 0;
-  // The game starts immediately. The IP fetch and final replay check happen
-  // in the background. This prioritizes a fast start for the user.
-  showLabelCard(0);
+  // Save full game state to draft now that userId and puzzleOrder are set
+  saveDraft();
+
+  showLabelCard(S.currentRound);
 
   // ── IP capture + user doc write happen in background after UI moves on ──
   (async () => {
@@ -1066,6 +1077,7 @@ function showLabelCard(roundIdx) {
 
 function showPuzzle(roundIdx) {
   S.currentRound = roundIdx;
+  saveDraft();
   const puzzleId = S.puzzleOrder[roundIdx];
   const puzzle = PUZZLE_BANK.find(p => p.id === puzzleId);
   S.r = makeRound(puzzleId);
