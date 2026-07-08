@@ -1,7 +1,7 @@
 ---
 title: "firestore_preprocessing"
 author: "Ken Isaka"
-date: "2026-07-02"
+date: "2026-07-07"
 output: html_document
 ---
 
@@ -9,73 +9,111 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
+## Data Preprocessing
 
-Data preprocessing of .json file from firestore
-```{r cars}
-# 1. Install required packages (uncomment and run if you don't have them yet)
+Data preprocessing of .json file from Firestore (30 users, 152 game logs as of 2026-07-07).
+
+```{r load-and-flatten}
 # install.packages(c("jsonlite", "dplyr", "tidyr", "purrr"))
 
-# Load the libraries
 library(jsonlite)
 library(dplyr)
 library(tidyr)
 library(purrr)
+library(lmtest)
 
-# 2. Load the Raw JSON Data
-# We use simplifyVector = FALSE to keep the raw list structure intact initially.
-# This prevents jsonlite from trying (and failing) to force irregular arrays into matrices.
-cat("Loading data from data_pipeline/firestore_export.json...\n")
-# You need to change the path is we move the .json file and/or the preprocessing
+# Load raw JSON — simplifyVector = FALSE preserves irregular arrays as lists
 raw_data <- fromJSON("firestore_export.json", simplifyVector = FALSE)
 
-# 2. Flatten the Users Collection
-# Notice we are accessing raw_data$users directly now
+cat("Users:", length(raw_data$users), "\n")
+cat("GameLogs:", length(raw_data$gameLogs), "\n")
+
+# Flatten users
 users_df <- tibble(
   document_id = names(raw_data$users),
   data = raw_data$users
 ) %>%
-  unnest_wider(data) 
+  unnest_wider(data)
 
-# 3. Flatten the GameLogs Collection
+# Flatten gameLogs
 gamelogs_df <- tibble(
   document_id = names(raw_data$gameLogs),
   data = raw_data$gameLogs
 ) %>%
   unnest_wider(data)
 
-# 4. Join into the Master Dataset
+# puzzleOrder (users) and rawSubmissionTimestamps (gameLogs) are list columns.
+# Convert puzzleOrder to a comma-separated string for easier analysis.
+users_df <- users_df %>%
+  mutate(puzzleOrder = map_chr(puzzleOrder, ~ paste(.x, collapse = ",")))
+
+# rawSubmissionTimestamps kept as list; drop for master join to keep it tidy.
+gamelogs_df <- gamelogs_df %>%
+  select(-rawSubmissionTimestamps)
+
+# Join: drop treatment/isReplay from gameLogs (duplicated in users), then join on userId
 experiment_master <- gamelogs_df %>%
-  # Drop treatment and isReplay from gameLogs before joining 
-  # so we don't get duplicate '.x' and '.y' columns
-  select(-treatment, -isReplay) %>% 
+  select(-treatment, -isReplay) %>%
   left_join(users_df, by = "userId") %>%
-  # Drop the Firestore document IDs as they aren't needed for analysis
   select(-starts_with("document_id"))
 
-# 5. Verify the data types and structure
 glimpse(experiment_master)
-View(experiment_master)
 ```
 
-## Including Plots
+## Covariate Balance Check
 
-Check for randomization frequencies
+Check randomization frequencies across treatment arms.
 
-```{r pressure, echo=FALSE}
-# 1. Randomization / Balance Check
-cat("--- Covariate Balance --- \n")
+```{r balance-check}
+cat("--- Treatment Assignment ---\n")
+treatment_counts <- experiment_master %>%
+  distinct(userId, .keep_all = TRUE) %>%
+  count(treatment)
+print(treatment_counts)
+
+cat("\n--- Covariate Balance ---\n")
 balance_check <- experiment_master %>%
-  # We only need one row per user to check demographics, not one per round
   distinct(userId, .keep_all = TRUE) %>%
   group_by(treatment) %>%
   summarize(
-    n_users = n(),
-    avg_age = mean(age, na.rm = TRUE),
+    n_users           = n(),
+    avg_age           = mean(age, na.rm = TRUE),
     avg_quant_exposure = mean(quantitativeExposure, na.rm = TRUE),
-    avg_puzzle_skill = mean(puzzleSkill, na.rm = TRUE)
+    avg_puzzle_skill  = mean(puzzleSkill, na.rm = TRUE),
+    avg_puzzle_enjoy  = mean(puzzleEnjoyment, na.rm = TRUE),
+    avg_energy        = mean(energyLevel, na.rm = TRUE),
+    pct_desktop       = mean(deviceType == "Desktop", na.rm = TRUE)
   )
 print(balance_check)
+
+cat("\n--- Gender Distribution by Treatment ---\n")
+gender_dist <- experiment_master %>%
+  distinct(userId, .keep_all = TRUE) %>%
+  count(treatment, gender) %>%
+  group_by(treatment) %>%
+  mutate(pct = round(n / sum(n), 2))
+print(gender_dist)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+## Outcome Summary
+
+```{r outcome-summary}
+cat("--- Solve Rate by Treatment ---\n")
+outcome_summary <- experiment_master %>%
+  group_by(treatment) %>%
+  summarize(
+    n_rounds          = n(),
+    solve_rate        = mean(isSolved, na.rm = TRUE),
+    avg_time_engaged  = mean(timeEngaged, na.rm = TRUE),
+    avg_attempts      = mean(attemptCount, na.rm = TRUE),
+    skip_rate         = mean(didSkip, na.rm = TRUE),
+    avg_rage_clicks   = mean(rageClicks, na.rm = TRUE)
+  )
+print(outcome_summary)
+```
+
+
+```{r regression}
+m1 <- lm(timeEngaged ~ treatment + puzzleSkill + age + quantitativeExposure + puzzleFrequency, data = experiment_master)
+coeftest(m1)
+```
