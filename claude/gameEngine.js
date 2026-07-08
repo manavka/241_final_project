@@ -1602,7 +1602,7 @@ const P4_SHAPES = [
   { label:'Pentagon', sides:5 },
   { label:'Hexagon',  sides:6 },
 ];
-const P4_COLOR_MAP = { 3:'#ef4444', 4:'#3b82f6', 5:'#22c55e', 6:'#a855f7' }; // keyed by sides
+const P4_COLOR_MAP = { 3:'#CC3311', 4:'#0077BB', 5:'#009988', 6:'#a855f7' }; // keyed by sides
 
 function genP4Puzzle() {
   // Fixed puzzle — rule: value = sides × 4
@@ -1622,6 +1622,10 @@ function renderP4Row(container, shapeSeq) {
   shapeSeq.forEach((item, i) => {
     const col = el('div', 'hybrid-shape');
     col.appendChild(makeSVGPolygon(item.sides, P4_COLOR_MAP[item.sides], 44, 0, false));
+    const nameLbl = el('span');
+    nameLbl.style.cssText = 'font-family:"Space Grotesk",sans-serif;font-size:9px;font-weight:700;color:var(--lavender);letter-spacing:0.04em;text-transform:uppercase;';
+    nameLbl.textContent = item.label;
+    col.appendChild(nameLbl);
     col.appendChild(item.value !== null
       ? el('div', 'hybrid-num', String(item.value))
       : el('div', 'hybrid-blank', '?'));
