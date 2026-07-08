@@ -7,7 +7,7 @@ import { signInAnon, createUser, saveGameLog, savePartialLog, updateHonestyCheck
 const SKIP_ENABLE_SECONDS = 30;
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 const COLORS_CYCLE = ['Red', 'Blue', 'Green', 'Yellow', 'Purple'];
-const COLOR_HEX = { Red:'#ef4444', Blue:'#3b82f6', Green:'#22c55e', Yellow:'#eab308', Purple:'#a855f7', Orange:'#f97316' };
+const COLOR_HEX = { Red:'#CC3311', Blue:'#0077BB', Green:'#009988', Yellow:'#eab308', Purple:'#a855f7', Orange:'#f97316' };
 const ROTATION_OPTIONS = [0, 45, 90, 135, 180, 225, 270, 315];
 
 const PUZZLE_BANK = [
