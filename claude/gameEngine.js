@@ -1533,7 +1533,7 @@ function renderPuzzle3(box) {
   refreshRotStrip();
 
   // ── RIGHT: color toolbar ──
-  const colorBar = el('div', 'p3-bar');
+  const colorBar = el('div', 'p3-color-bar');
   colorBar.appendChild(barLbl('Color'));
   const colorDots = [];
   P3_COLORS.forEach(col => {
