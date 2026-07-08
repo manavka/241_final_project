@@ -54,6 +54,8 @@ const S = {
   completedLogs: [],        // saved round log objects for scoring
   ipAddress: null,
   isReplay: false,          // true if this browser has completed a session before
+  sessionTimestamp: null,   // ISO timestamp of first session start
+  resumeRound: null,        // round index at which a multi-session resume happened
   // per-round (reset each round)
   r: null,
 };
@@ -72,6 +74,8 @@ function resetSession() {
   S.completedLogs = [];
   S.ipAddress = null;
   S.isReplay = false;
+  S.sessionTimestamp = null;
+  S.resumeRound = null;
   S.r = null;
 }
 
@@ -123,10 +127,12 @@ function isAdminMode() { return !!localStorage.getItem('lpc_admin'); }
 // ── Draft session persistence ──
 function saveDraft() {
   localStorage.setItem('lpc_draft', JSON.stringify({
-    treatment:    S.treatment,
-    userId:       S.userId       || null,
-    puzzleOrder:  S.puzzleOrder  || [],
-    currentRound: S.currentRound || 0,
+    treatment:        S.treatment,
+    userId:           S.userId           || null,
+    puzzleOrder:      S.puzzleOrder      || [],
+    currentRound:     S.currentRound     || 0,
+    surveyAnswers:    S.surveyAnswers     || {},
+    sessionTimestamp: S.sessionTimestamp || new Date().toISOString(),
   }));
 }
 function clearDraft() { localStorage.removeItem('lpc_draft'); }
@@ -600,8 +606,10 @@ function showWelcomeBack(draft) {
     inner.appendChild(sub);
 
     const continueBtn = makeBtn('Continue where I left off', () => {
-      S.treatment = draft.treatment;
-      showSurvey(0);
+      S.treatment          = draft.treatment;
+      S.surveyAnswers      = draft.surveyAnswers || {};
+      S.sessionTimestamp   = draft.sessionTimestamp || null;
+      showInstructions();
     });
     continueBtn.style.marginBottom = '12px';
     inner.appendChild(continueBtn);
@@ -795,7 +803,14 @@ function showSurvey(idx) {
         return;
       }
       S.surveyAnswers[q.id] = val;
-      idx < total - 1 ? showSurvey(idx + 1) : showInstructions();
+      if (idx === total - 1) {
+        // Survey complete — persist answers so they're restored on resume
+        if (!S.sessionTimestamp) S.sessionTimestamp = new Date().toISOString();
+        saveDraft();
+        showInstructions();
+      } else {
+        showSurvey(idx + 1);
+      }
     });
     nextBtn.style.marginBottom = '10px';
     inner.appendChild(nextBtn);
@@ -909,9 +924,11 @@ async function onStartChallenge() {
 
   if (resuming) {
     // Restore saved game state so round logs share the same userId
-    S.userId       = draft.userId;
-    S.puzzleOrder  = draft.puzzleOrder;
-    S.currentRound = draft.currentRound;
+    S.userId         = draft.userId;
+    S.puzzleOrder    = draft.puzzleOrder;
+    S.currentRound   = draft.currentRound;
+    S.resumeRound    = draft.currentRound;  // flag which round the break happened at
+    S.sessionTimestamp = draft.sessionTimestamp || null;
   } else {
     // Fresh game — shuffle puzzles and start from round 0
     const shuffled = fisherYates([...PUZZLE_BANK]);
@@ -950,7 +967,8 @@ async function onStartChallenge() {
       ipAddress: S.ipAddress,
       isReplay: S.isReplay,
       multiSession: resuming ? true : false,
-      timestamp: new Date().toISOString(),
+      resumeRound: S.resumeRound,
+      timestamp: S.sessionTimestamp || new Date().toISOString(),
       deviceType: (/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth < 768) ? 'Mobile' : 'Desktop',
       puzzleOrder: S.puzzleOrder,
       breaksTaken: 0,
