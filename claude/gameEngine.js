@@ -535,7 +535,10 @@ function showConsent() {
       </p>
     `;
 
-    const btn = makeBtn('I understand — let\'s go', () => showSurvey(0));
+    const btn = makeBtn('I understand — let\'s go', () => {
+      const hasPlayed = !!localStorage.getItem('lpc_played');
+      hasPlayed ? showReplayCheck() : showSurvey(0);
+    });
     btn.style.marginBottom = '16px';
     card.appendChild(btn);
 
@@ -545,6 +548,71 @@ function showConsent() {
 
     wrap.appendChild(card);
     app.appendChild(wrap);
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════
+// REPLAY CHECK (shown before survey when isReplay === true)
+// ════════════════════════════════════════════════════════════════════
+
+function showReplayCheck() {
+  go(app => {
+    addAnimBg(app);
+
+    const scroller = el('div');
+    scroller.style.cssText = 'position:absolute;inset:0;overflow-y:auto;display:flex;flex-direction:column;align-items:center;z-index:10;';
+
+    const inner = el('div');
+    inner.style.cssText = 'width:100%;max-width:440px;margin:auto;padding:22px 16px;display:flex;flex-direction:column;align-items:center;text-align:center;';
+
+    const qLabel = el('h2', 'headline', 'It looks like this device has been used to play before.');
+    qLabel.style.cssText = 'font-size:clamp(20px,5vw,26px);line-height:1.3;color:#e2d9f3;margin-bottom:10px;';
+    inner.appendChild(qLabel);
+
+    const sub = el('p', '', 'Are you a new player, or have you played this game before on this device?');
+    sub.style.cssText = 'font-family:"Space Grotesk",sans-serif;font-size:15px;color:#c4b5fd;margin-bottom:24px;line-height:1.6;';
+    inner.appendChild(sub);
+
+    const options = [
+      { label: "I'm a new player — I haven't played this before", value: 'new_player' },
+      { label: "I've played this game before on this device",      value: 'returning'  },
+    ];
+
+    const grid = el('div');
+    grid.style.cssText = 'display:flex;flex-direction:column;gap:7px;width:100%;margin-bottom:18px;';
+    let selected = null;
+
+    options.forEach(opt => {
+      const card = el('button', 'survey-card', opt.label);
+      card.addEventListener('click', () => {
+        grid.querySelectorAll('.survey-card').forEach(c => c.classList.remove('selected'));
+        card.classList.add('selected');
+        selected = opt.value;
+      });
+      grid.appendChild(card);
+    });
+    inner.appendChild(grid);
+
+    const errMsg = el('p', 'flash-msg', '');
+    errMsg.style.marginBottom = '8px';
+    inner.appendChild(errMsg);
+
+    const nextBtn = makeBtn('Next →', () => {
+      if (!selected) { errMsg.textContent = 'Please answer this question to continue.'; return; }
+      S.surveyAnswers.sharedDevice = selected;
+      showSurvey(0);
+    });
+    nextBtn.style.marginBottom = '10px';
+    inner.appendChild(nextBtn);
+
+    const optOut = el('button');
+    optOut.style.cssText = 'background:none;border:none;font-family:"Space Grotesk",sans-serif;font-size:13px;color:#ffffff;cursor:pointer;text-decoration:underline;margin-top:4px;';
+    optOut.textContent = 'I\'d rather not participate';
+    optOut.addEventListener('click', showOptOut);
+    inner.appendChild(optOut);
+
+    scroller.appendChild(inner);
+    app.appendChild(scroller);
   });
 }
 
