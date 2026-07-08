@@ -915,7 +915,7 @@ async function onStartChallenge() {
     S.userId         = draft.userId;
     S.puzzleOrder    = draft.puzzleOrder;
     S.currentRound   = draft.currentRound;
-    S.resumeRound    = draft.currentRound;  // flag which round the break happened at
+    S.resumeRound    = draft.currentRound + 1;  // 1-based to match roundNumber in gameLogs
     S.sessionTimestamp = draft.sessionTimestamp || null;
   } else {
     // Fresh game — shuffle puzzles and start from round 0
