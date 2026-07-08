@@ -2087,6 +2087,7 @@ function registerBeforeUnload() {
 // ════════════════════════════════════════════════════════════════════
 
 async function showResults() {
+  clearDraft(); // All rounds done — next person on this device starts fresh
   // No tab-away modal on results screen
   if (_tabHandler)  document.removeEventListener('visibilitychange', _tabHandler);
   if (_blurHandler)  window.removeEventListener('blur', _blurHandler);
