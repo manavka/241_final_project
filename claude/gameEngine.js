@@ -120,6 +120,16 @@ function makeRound(puzzleId) {
 // ── Admin mode (Shift+Ctrl+A toggles, persists in localStorage) ──
 function isAdminMode() { return !!localStorage.getItem('lpc_admin'); }
 
+// ── Draft session persistence ──
+function saveDraft() {
+  localStorage.setItem('lpc_draft', JSON.stringify({
+    treatment:     S.treatment,
+    surveyAnswers: S.surveyAnswers,
+    surveyPage:    S.surveyPage,
+  }));
+}
+function clearDraft() { localStorage.removeItem('lpc_draft'); }
+
 function setAdminBadge(on) {
   let badge = document.getElementById('admin-badge');
   if (on) {
@@ -536,8 +546,16 @@ function showConsent() {
     `;
 
     const btn = makeBtn('I understand — let\'s go', () => {
-      const hasPlayed = !!localStorage.getItem('lpc_played');
-      hasPlayed ? showReplayCheck() : showSurvey(0);
+      const saved = localStorage.getItem('lpc_draft');
+      if (saved) {
+        showWelcomeBack(JSON.parse(saved));
+      } else {
+        const r = Math.random();
+        S.treatment = r < 0.333 ? 'no_label' : r < 0.666 ? 'hard_label' : 'easy_label';
+        saveDraft();
+        const hasPlayed = !!localStorage.getItem('lpc_played');
+        hasPlayed ? showReplayCheck() : showSurvey(0);
+      }
     });
     btn.style.marginBottom = '16px';
     card.appendChild(btn);
@@ -548,6 +566,61 @@ function showConsent() {
 
     wrap.appendChild(card);
     app.appendChild(wrap);
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════
+// WELCOME BACK (shown when a saved draft is detected on consent)
+// ════════════════════════════════════════════════════════════════════
+
+function showWelcomeBack(draft) {
+  go(app => {
+    addAnimBg(app);
+
+    const scroller = el('div');
+    scroller.style.cssText = 'position:absolute;inset:0;overflow-y:auto;display:flex;flex-direction:column;align-items:center;z-index:10;';
+
+    const inner = el('div');
+    inner.style.cssText = 'width:100%;max-width:440px;margin:auto;padding:22px 16px;display:flex;flex-direction:column;align-items:center;text-align:center;';
+
+    const qLabel = el('h2', 'headline', 'Welcome back!');
+    qLabel.style.cssText = 'font-size:clamp(20px,5vw,26px);line-height:1.3;color:#e2d9f3;margin-bottom:10px;';
+    inner.appendChild(qLabel);
+
+    const answered = Object.keys(draft.surveyAnswers).length;
+    const sub = el('p', '', `You left off on question ${draft.surveyPage + 1} of ${SURVEY_QUESTIONS.length}. Want to continue where you left off?`);
+    sub.style.cssText = 'font-family:"Space Grotesk",sans-serif;font-size:15px;color:#c4b5fd;margin-bottom:28px;line-height:1.6;';
+    inner.appendChild(sub);
+
+    const continueBtn = makeBtn('Continue where I left off', () => {
+      S.treatment     = draft.treatment;
+      S.surveyAnswers = draft.surveyAnswers;
+      S.surveyPage    = draft.surveyPage;
+      showSurvey(draft.surveyPage);
+    });
+    continueBtn.style.marginBottom = '12px';
+    inner.appendChild(continueBtn);
+
+    const freshBtn = el('button', 'btn-ghost', 'Start fresh instead');
+    freshBtn.addEventListener('click', () => {
+      clearDraft();
+      const r = Math.random();
+      S.treatment = r < 0.333 ? 'no_label' : r < 0.666 ? 'hard_label' : 'easy_label';
+      saveDraft();
+      const hasPlayed = !!localStorage.getItem('lpc_played');
+      hasPlayed ? showReplayCheck() : showSurvey(0);
+    });
+    freshBtn.style.marginBottom = '10px';
+    inner.appendChild(freshBtn);
+
+    const optOut = el('button');
+    optOut.style.cssText = 'background:none;border:none;font-family:"Space Grotesk",sans-serif;font-size:13px;color:#ffffff;cursor:pointer;text-decoration:underline;margin-top:4px;';
+    optOut.textContent = 'I\'d rather not participate';
+    optOut.addEventListener('click', showOptOut);
+    inner.appendChild(optOut);
+
+    scroller.appendChild(inner);
+    app.appendChild(scroller);
   });
 }
 
@@ -717,6 +790,8 @@ function showSurvey(idx) {
         return;
       }
       S.surveyAnswers[q.id] = val;
+      S.surveyPage = idx + 1;
+      saveDraft();
       idx < total - 1 ? showSurvey(idx + 1) : showInstructions();
     });
     nextBtn.style.marginBottom = '10px';
@@ -749,7 +824,7 @@ function showSurvey(idx) {
 // ════════════════════════════════════════════════════════════════════
 
 function showOptOut() {
-  // Clear in-memory survey answers
+  clearDraft();
   S.surveyAnswers = {};
   const overlay = el('div', 'optout-screen');
   overlay.innerHTML = `
@@ -820,9 +895,11 @@ function showInstructions() {
 }
 
 async function onStartChallenge() {
-  // ── Treatment assignment ──
-  const r = Math.random();
-  S.treatment = r < 0.333 ? 'no_label' : r < 0.666 ? 'hard_label' : 'easy_label';
+  // Treatment was assigned and saved at consent time; assign fallback only if missing
+  if (!S.treatment) {
+    const r = Math.random();
+    S.treatment = r < 0.333 ? 'no_label' : r < 0.666 ? 'hard_label' : 'easy_label';
+  }
 
   // ── Puzzle shuffle ──
   const shuffled = fisherYates([...PUZZLE_BANK]);
@@ -2048,6 +2125,7 @@ async function showResults() {
         const replayKey = 'lpc_played_' + (S.ipAddress || 'local');
         localStorage.setItem(replayKey, '1');
         localStorage.setItem('lpc_played', '1');
+        clearDraft();
         // Replace honesty section with thank-you, then reset state and return to landing
         honSection.innerHTML = `
           <p style="font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:22px;color:var(--text);margin-bottom:6px;">Thank you! 🙏</p>
