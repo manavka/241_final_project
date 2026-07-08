@@ -1404,9 +1404,15 @@ function genP3Sequence() {
 function renderP3Preview(container) {
   container.innerHTML = '';
   S.r._p3seq.forEach((d, i) => {
+    const wrap = el('div');
+    wrap.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:3px;flex-shrink:0;';
     const svg = makeSVGPolygon(d.sides, COLOR_HEX[d.color], 46, d.rotation);
-    svg.style.flexShrink = '0';
-    container.appendChild(svg);
+    wrap.appendChild(svg);
+    const lbl = el('span');
+    lbl.style.cssText = 'font-family:"Space Grotesk",sans-serif;font-size:9px;font-weight:700;color:var(--lavender);letter-spacing:0.04em;text-transform:uppercase;';
+    lbl.textContent = d.color;
+    wrap.appendChild(lbl);
+    container.appendChild(wrap);
     if (i < S.r._p3seq.length - 1) {
       const a = el('span'); a.style.cssText = 'color:var(--text);font-size:22px;'; a.textContent = '→';
       container.appendChild(a);
@@ -1531,19 +1537,25 @@ function renderPuzzle3(box) {
   colorBar.appendChild(barLbl('Color'));
   const colorDots = [];
   P3_COLORS.forEach(col => {
-    const dot = el('div', 'p3-dot');
-    dot.style.background = COLOR_HEX[col];
-    if (col === sel.color) dot.classList.add('selected');
-    dot.title = col;
-    dot.addEventListener('click', () => {
+    const btn = el('div', 'p3-tool');
+    const swatch = el('div');
+    swatch.style.cssText = `width:28px;height:28px;border-radius:8px;background:${COLOR_HEX[col]};flex-shrink:0;pointer-events:none;`;
+    btn.appendChild(swatch);
+    const lbl = el('span');
+    lbl.style.cssText = 'font-size:9px;color:var(--text-2);font-family:"Space Grotesk",sans-serif;margin-top:1px;';
+    lbl.textContent = col;
+    btn.appendChild(lbl);
+    if (col === sel.color) btn.classList.add('selected');
+    btn.title = col;
+    btn.addEventListener('click', () => {
       if (S.r.isSolved) return;
       sel.color = col;
       colorDots.forEach(d => d.classList.remove('selected'));
-      dot.classList.add('selected');
+      btn.classList.add('selected');
       refreshRotStrip(); updateCanvas();
     });
-    colorDots.push(dot);
-    colorBar.appendChild(dot);
+    colorDots.push(btn);
+    colorBar.appendChild(btn);
   });
   paint.appendChild(colorBar);
 
