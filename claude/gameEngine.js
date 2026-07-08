@@ -949,6 +949,7 @@ async function onStartChallenge() {
       treatment: S.treatment,
       ipAddress: S.ipAddress,
       isReplay: S.isReplay,
+      multiSession: resuming ? true : false,
       timestamp: new Date().toISOString(),
       deviceType: (/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth < 768) ? 'Mobile' : 'Desktop',
       puzzleOrder: S.puzzleOrder,
