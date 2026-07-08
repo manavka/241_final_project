@@ -601,7 +601,7 @@ function showWelcomeBack(draft) {
     qLabel.style.cssText = 'font-size:clamp(20px,5vw,26px);line-height:1.3;color:#e2d9f3;margin-bottom:10px;';
     inner.appendChild(qLabel);
 
-    const sub = el('p', '', `You completed ${draft.currentRound} of 5 puzzles last time. You'll need to fill out the survey again, then you'll pick up from puzzle ${draft.currentRound + 1}.`);
+    const sub = el('p', '', `You completed ${draft.currentRound} of 5 puzzles last time. Pick up right where you left off — no need to redo anything.`);
     sub.style.cssText = 'font-family:"Space Grotesk",sans-serif;font-size:15px;color:#c4b5fd;margin-bottom:28px;line-height:1.6;';
     inner.appendChild(sub);
 
@@ -613,18 +613,6 @@ function showWelcomeBack(draft) {
     });
     continueBtn.style.marginBottom = '12px';
     inner.appendChild(continueBtn);
-
-    const freshBtn = el('button', 'btn-ghost', 'Start fresh instead');
-    freshBtn.addEventListener('click', () => {
-      clearDraft();
-      const r = Math.random();
-      S.treatment = r < 0.333 ? 'no_label' : r < 0.666 ? 'hard_label' : 'easy_label';
-      saveDraft();
-      const hasPlayed = !!localStorage.getItem('lpc_played');
-      hasPlayed ? showReplayCheck() : showSurvey(0);
-    });
-    freshBtn.style.marginBottom = '10px';
-    inner.appendChild(freshBtn);
 
     const optOut = el('button');
     optOut.style.cssText = 'background:none;border:none;font-family:"Space Grotesk",sans-serif;font-size:13px;color:#ffffff;cursor:pointer;text-decoration:underline;margin-top:4px;';
