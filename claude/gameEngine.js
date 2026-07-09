@@ -1,4 +1,4 @@
-import { signInAnon, createUser, saveGameLog, savePartialLog, updateHonestyCheck, updateUserField, getLeaderboardScores } from './dataHandler.js';
+import { signInAnon, createUser, saveGameLog, savePartialLog, updateHonestyCheck, updateUserField, appendUserArrayField, getLeaderboardScores } from './dataHandler.js';
 
 // ════════════════════════════════════════════════════════════════════
 // CONSTANTS
@@ -951,7 +951,8 @@ async function onStartChallenge() {
 
     if (resuming) {
       // Update the existing user doc — don't create a duplicate
-      updateUserField(S.userId, { multiSession: true, resumeRound: S.resumeRound });
+      updateUserField(S.userId, { multiSession: true });
+      appendUserArrayField(S.userId, 'resumeRounds', S.resumeRound);
     } else {
       const userObj = {
         userId: S.userId,
@@ -959,7 +960,7 @@ async function onStartChallenge() {
         ipAddress: S.ipAddress,
         isReplay: S.isReplay,
         multiSession: false,
-        resumeRound: null,
+        resumeRounds: [],
         timestamp: S.sessionTimestamp || new Date().toISOString(),
         deviceType: (/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth < 768) ? 'Mobile' : 'Desktop',
         puzzleOrder: S.puzzleOrder,
