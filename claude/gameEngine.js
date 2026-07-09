@@ -2112,6 +2112,11 @@ function registerBeforeUnload() {
 
 async function showResults() {
   clearDraft();
+  // Mark this browser as played now so shared-device detection works even if
+  // the user closes the tab before clicking the honesty check button
+  const _replayKey = 'lpc_played_' + (S.ipAddress || 'local');
+  localStorage.setItem(_replayKey, '1');
+  localStorage.setItem('lpc_played', '1');
   // Mark user as having completed all 5 puzzles
   markSessionComplete(S.userId);
   // No tab-away modal on results screen
