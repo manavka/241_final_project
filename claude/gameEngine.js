@@ -1,4 +1,4 @@
-import { signInAnon, createUser, saveGameLog, savePartialLog, updateHonestyCheck, getLeaderboardScores } from './dataHandler.js';
+import { signInAnon, createUser, saveGameLog, savePartialLog, updateHonestyCheck, updateUserField, getLeaderboardScores } from './dataHandler.js';
 
 // ════════════════════════════════════════════════════════════════════
 // CONSTANTS
@@ -949,22 +949,27 @@ async function onStartChallenge() {
     const replayKey = 'lpc_played_' + (S.ipAddress || 'local');
     S.isReplay = !!localStorage.getItem(replayKey) || !!localStorage.getItem('lpc_played');
 
-    const userObj = {
-      userId: S.userId,
-      treatment: S.treatment,
-      ipAddress: S.ipAddress,
-      isReplay: S.isReplay,
-      multiSession: resuming ? true : false,
-      resumeRound: S.resumeRound,
-      timestamp: S.sessionTimestamp || new Date().toISOString(),
-      deviceType: (/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth < 768) ? 'Mobile' : 'Desktop',
-      puzzleOrder: S.puzzleOrder,
-      breaksTaken: 0,
-      totalBreakTime: 0,
-      honestyCheck: null,
-      ...S.surveyAnswers,
-    };
-    createUser(userObj);
+    if (resuming) {
+      // Update the existing user doc — don't create a duplicate
+      updateUserField(S.userId, { multiSession: true, resumeRound: S.resumeRound });
+    } else {
+      const userObj = {
+        userId: S.userId,
+        treatment: S.treatment,
+        ipAddress: S.ipAddress,
+        isReplay: S.isReplay,
+        multiSession: false,
+        resumeRound: null,
+        timestamp: S.sessionTimestamp || new Date().toISOString(),
+        deviceType: (/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth < 768) ? 'Mobile' : 'Desktop',
+        puzzleOrder: S.puzzleOrder,
+        breaksTaken: 0,
+        totalBreakTime: 0,
+        honestyCheck: null,
+        ...S.surveyAnswers,
+      };
+      createUser(userObj);
+    }
   })();
 }
 
