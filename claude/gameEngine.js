@@ -49,12 +49,10 @@ const S = {
   surveyPage: 0,
   puzzleOrder: [],          // shuffled puzzle ids
   currentRound: 0,         // 0-based index
-  breaksTaken: 0,
-  totalBreakTime: 0,
   completedLogs: [],        // saved round log objects for scoring
   ipAddress: null,
   isReplay: false,          // true if this browser has completed a session before
-  sessionTimestamp: null,   // ISO timestamp of first session start
+  sessionTimestamp: null,   // ISO timestamp of first session start (user-level)
   resumeRound: null,        // round index at which a multi-session resume happened
   // per-round (reset each round)
   r: null,
@@ -69,8 +67,6 @@ function resetSession() {
   S.surveyPage = 0;
   S.puzzleOrder = [];
   S.currentRound = 0;
-  S.breaksTaken = 0;
-  S.totalBreakTime = 0;
   S.completedLogs = [];
   S.ipAddress = null;
   S.isReplay = false;
@@ -971,7 +967,7 @@ async function onStartChallenge() {
         timestamp: S.sessionTimestamp || new Date().toISOString(),
         deviceType: (/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth < 768) ? 'Mobile' : 'Desktop',
         puzzleOrder: S.puzzleOrder,
-        breakSessions: [],
+        breakLog: [],
         sessionComplete: false,
         honestyCheck: null,
         ...S.surveyAnswers,
@@ -995,6 +991,7 @@ function showLabelCard(roundIdx) {
   let _dismissed = false;
   let _paused = false;
   let _breakStart = null;
+  let _breakStartISO = null;
 
   go(app => {
     addAnimBg(app);
@@ -1076,17 +1073,20 @@ function showLabelCard(roundIdx) {
       e.stopPropagation();
       if (!_paused) {
         _paused = true;
-        _breakStart = Date.now();
+        _breakStart    = Date.now();
+        _breakStartISO = new Date().toISOString();
         pauseBtn.textContent = 'Resume →';
         pauseBtn.style.borderColor = 'rgba(167,139,250,0.70)';
         pauseBtn.style.color = 'var(--text)';
       } else {
         _paused = false;
         if (_breakStart) {
-          S.breaksTaken++;
-          S.totalBreakTime += (Date.now() - _breakStart) / 1000;
+          const duration = parseFloat(((Date.now() - _breakStart) / 1000).toFixed(2));
           _breakStart = null;
-          saveDraft();
+          if (S.userId) {
+            appendUserArrayField(S.userId, 'breakLog', { timestamp: _breakStartISO, duration });
+          }
+          _breakStartISO = null;
         }
         pauseBtn.textContent = 'Take a Break ⏸';
         pauseBtn.style.borderColor = 'rgba(167,139,250,0.35)';
@@ -2112,13 +2112,6 @@ function registerBeforeUnload() {
 
 async function showResults() {
   clearDraft();
-  // Append one object per session so multi-session breaks are distinguishable.
-  // The sessionTimestamp makes each entry unique so arrayUnion never deduplicates.
-  appendUserArrayField(S.userId, 'breakSessions', {
-    breaksTaken:    S.breaksTaken,
-    totalBreakTime: parseFloat(S.totalBreakTime.toFixed(2)),
-    sessionTimestamp: S.sessionTimestamp || new Date().toISOString(),
-  });
   // Mark user as having completed all 5 puzzles
   markSessionComplete(S.userId);
   // No tab-away modal on results screen
