@@ -2126,6 +2126,8 @@ async function showResults() {
   _tabHandler = null; _blurHandler = null; _focusHandler = null;
 
   const totalScore = Math.max(0, S.completedLogs.reduce((sum, l) => sum + calcRoundScore(l), 0));
+  // Save score to user doc so leaderboard reads users, not all gameLogs
+  updateUserField(S.userId, { totalScore });
 
   go(app => {
     blobs(app);

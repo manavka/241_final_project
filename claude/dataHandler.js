@@ -181,63 +181,32 @@ export async function updateHonestyCheck(userId, value) {
 export async function getLeaderboardScores() {
   const ok = await loadFirebase();
   if (!ok) {
-    // Aggregate local logs for a local-only leaderboard
     return collectLocalScores();
   }
   try {
-    const snap = await _getDocs(_collection(db, 'gameLogs'));
-    const allLogs = snap.docs.map(d => d.data());
-    return aggregateScores(allLogs);
+    // Read completed user docs only — totalScore is written at session end
+    const q = _query(_collection(db, 'users'), _where('sessionComplete', '==', true));
+    const snap = await _getDocs(q);
+    return snap.docs.map(d => ({ userId: d.data().userId, totalScore: d.data().totalScore || 0 }));
   } catch (e) {
     console.warn('Leaderboard fetch failed:', e);
     return [];
   }
 }
 
-function aggregateScores(allLogs) {
-  // Group by userId; for each roundNumber keep the completed log if one exists
-  const byUser = {};
-  for (const log of allLogs) {
-    if (!byUser[log.userId]) byUser[log.userId] = {};
-    const rn = log.roundNumber;
-    const existing = byUser[log.userId][rn];
-    if (!existing || log.isSolved || log.didSkip) byUser[log.userId][rn] = log;
-  }
-  const scores = [];
-  for (const [uid, byRound] of Object.entries(byUser)) {
-    const uniqueLogs = Object.values(byRound);
-    if (uniqueLogs.length !== 5) continue;
-    if (!uniqueLogs.every(l => l.isSolved || l.didSkip)) continue;
-    const total = Math.max(0, uniqueLogs.reduce((sum, l) => sum + calcRoundScore(l), 0));
-    scores.push({ userId: uid, totalScore: total });
-  }
-  return scores;
-}
-
 function collectLocalScores() {
-  const byUser = {};
+  const result = [];
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
-    if (!key.startsWith('gameLog_')) continue;
-    const log = JSON.parse(localStorage.getItem(key));
-    if (!byUser[log.userId]) byUser[log.userId] = {};
-    const rn = log.roundNumber;
-    const existing = byUser[log.userId][rn];
-    if (!existing || log.isSolved || log.didSkip) byUser[log.userId][rn] = log;
-  }
-  const result = [];
-  for (const [uid, byRound] of Object.entries(byUser)) {
-    const uniqueLogs = Object.values(byRound);
-    if (uniqueLogs.length !== 5) continue;
-    if (!uniqueLogs.every(l => l.isSolved || l.didSkip)) continue;
-    result.push({ userId: uid, totalScore: Math.max(0, uniqueLogs.reduce((s, l) => s + calcRoundScore(l), 0)) });
+    if (!key.startsWith('userData_')) continue;
+    try {
+      const user = JSON.parse(localStorage.getItem(key));
+      if (user.sessionComplete && user.totalScore != null) {
+        result.push({ userId: user.userId, totalScore: user.totalScore });
+      }
+    } catch {}
   }
   return result;
-}
-
-function calcRoundScore(log) {
-  if (!log.isSolved) return 0;
-  return 50 + Math.max(0, 50 - Math.floor(log.timeEngaged / 6));
 }
 
 // ── Retry / error handling ────────────────────────────────────────────────────
