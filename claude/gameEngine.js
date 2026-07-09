@@ -971,8 +971,7 @@ async function onStartChallenge() {
         timestamp: S.sessionTimestamp || new Date().toISOString(),
         deviceType: (/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth < 768) ? 'Mobile' : 'Desktop',
         puzzleOrder: S.puzzleOrder,
-        breaksTaken: [],
-        totalBreakTime: [],
+        breakSessions: [],
         sessionComplete: false,
         honestyCheck: null,
         ...S.surveyAnswers,
@@ -2113,9 +2112,13 @@ function registerBeforeUnload() {
 
 async function showResults() {
   clearDraft();
-  // Append this session's break data as new entries in the arrays
-  appendUserArrayField(S.userId, 'breaksTaken',    S.breaksTaken);
-  appendUserArrayField(S.userId, 'totalBreakTime', parseFloat(S.totalBreakTime.toFixed(2)));
+  // Append one object per session so multi-session breaks are distinguishable.
+  // The sessionTimestamp makes each entry unique so arrayUnion never deduplicates.
+  appendUserArrayField(S.userId, 'breakSessions', {
+    breaksTaken:    S.breaksTaken,
+    totalBreakTime: parseFloat(S.totalBreakTime.toFixed(2)),
+    sessionTimestamp: S.sessionTimestamp || new Date().toISOString(),
+  });
   // Mark user as having completed all 5 puzzles
   markSessionComplete(S.userId);
   // No tab-away modal on results screen
