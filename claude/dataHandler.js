@@ -112,27 +112,7 @@ export async function appendUserArrayField(userId, field, value) {
 // ── gameLogs collection ───────────────────────────────────────────────────────
 
 export async function markSessionComplete(userId) {
-  const ok = await loadFirebase();
-  if (!ok) {
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith(`gameLog_${userId}`)) {
-        try {
-          const log = JSON.parse(localStorage.getItem(key));
-          log.sessionComplete = true;
-          localStorage.setItem(key, JSON.stringify(log));
-        } catch {}
-      }
-    }
-    return;
-  }
-  try {
-    const q = _query(_collection(db, 'gameLogs'), _where('userId', '==', userId));
-    const snap = await _getDocs(q);
-    await Promise.all(snap.docs.map(d => _updateDoc(d.ref, { sessionComplete: true })));
-  } catch (e) {
-    console.error('Failed to mark session complete:', e);
-  }
+  await updateUserField(userId, { sessionComplete: true });
 }
 
 export async function getUserGameLogs(userId) {
@@ -215,36 +195,36 @@ export async function getLeaderboardScores() {
 }
 
 function aggregateScores(allLogs) {
-  // Group by userId, keep only users with exactly 5 sessionComplete=true rounds
+  // Group by userId, deduplicate by roundNumber (keep latest log per round)
   const byUser = {};
   for (const log of allLogs) {
-    if (!log.sessionComplete) continue;
-    if (!byUser[log.userId]) byUser[log.userId] = [];
-    byUser[log.userId].push(log);
+    if (!byUser[log.userId]) byUser[log.userId] = {};
+    byUser[log.userId][log.roundNumber] = log;
   }
   const scores = [];
-  for (const [uid, logs] of Object.entries(byUser)) {
-    if (logs.length !== 5) continue;
-    const total = Math.max(0, logs.reduce((sum, l) => sum + calcRoundScore(l), 0));
+  for (const [uid, byRound] of Object.entries(byUser)) {
+    const uniqueLogs = Object.values(byRound);
+    if (uniqueLogs.length !== 5) continue;
+    const total = Math.max(0, uniqueLogs.reduce((sum, l) => sum + calcRoundScore(l), 0));
     scores.push({ userId: uid, totalScore: total });
   }
   return scores;
 }
 
 function collectLocalScores() {
-  const scores = {};
+  const byUser = {};
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
     if (!key.startsWith('gameLog_')) continue;
     const log = JSON.parse(localStorage.getItem(key));
-    if (!log.sessionComplete) continue;
-    if (!scores[log.userId]) scores[log.userId] = [];
-    scores[log.userId].push(log);
+    if (!byUser[log.userId]) byUser[log.userId] = {};
+    byUser[log.userId][log.roundNumber] = log;
   }
   const result = [];
-  for (const [uid, logs] of Object.entries(scores)) {
-    if (logs.length !== 5) continue;
-    result.push({ userId: uid, totalScore: Math.max(0, logs.reduce((s, l) => s + calcRoundScore(l), 0)) });
+  for (const [uid, byRound] of Object.entries(byUser)) {
+    const uniqueLogs = Object.values(byRound);
+    if (uniqueLogs.length !== 5) continue;
+    result.push({ userId: uid, totalScore: Math.max(0, uniqueLogs.reduce((s, l) => s + calcRoundScore(l), 0)) });
   }
   return result;
 }

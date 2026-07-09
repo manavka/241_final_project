@@ -133,8 +133,6 @@ function saveDraft() {
     currentRound:     S.currentRound     || 0,
     surveyAnswers:    S.surveyAnswers     || {},
     sessionTimestamp: S.sessionTimestamp || new Date().toISOString(),
-    breaksTaken:      S.breaksTaken      || 0,
-    totalBreakTime:   S.totalBreakTime   || 0,
   }));
 }
 function clearDraft() { localStorage.removeItem('lpc_draft'); }
@@ -919,8 +917,6 @@ async function onStartChallenge() {
     S.currentRound     = draft.currentRound;
     S.resumeRound      = draft.currentRound + 1;  // 1-based to match roundNumber in gameLogs
     S.sessionTimestamp = draft.sessionTimestamp || null;
-    S.breaksTaken      = draft.breaksTaken      || 0;
-    S.totalBreakTime   = draft.totalBreakTime   || 0;
   } else {
     // Fresh game — shuffle puzzles and start from round 0
     const shuffled = fisherYates([...PUZZLE_BANK]);
@@ -975,8 +971,9 @@ async function onStartChallenge() {
         timestamp: S.sessionTimestamp || new Date().toISOString(),
         deviceType: (/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth < 768) ? 'Mobile' : 'Desktop',
         puzzleOrder: S.puzzleOrder,
-        breaksTaken: 0,
-        totalBreakTime: 0,
+        breaksTaken: [],
+        totalBreakTime: [],
+        sessionComplete: false,
         honestyCheck: null,
         ...S.surveyAnswers,
       };
@@ -1881,7 +1878,7 @@ function recordSubmission() {
 function onCorrect() {
   S.r.isSolved = true;
   timerStop();
-  logRound(true);
+  logRound();
   const checkBtn = document.querySelector('#puzzle-box .btn-check');
   if (checkBtn) btnFeedback(checkBtn, true, '');
   setTimeout(() => {
@@ -2012,7 +2009,7 @@ function setupTabSwitch(app) {
 function doSkip() {
   S.r.didSkip = true;
   timerStop();
-  logRound(true);
+  logRound();
   // Clean up rage click listener
   if (_rageClickHandler) {
     document.body.removeEventListener('click', _rageClickHandler, true);
@@ -2061,7 +2058,7 @@ function trackClick(key, ts) {
 // TELEMETRY LOG
 // ════════════════════════════════════════════════════════════════════
 
-async function logRound(sessionComplete) {
+async function logRound() {
   const puzzle = PUZZLE_BANK.find(p => p.id === S.r.puzzleId);
   const log = {
     userId: S.userId,
@@ -2070,7 +2067,6 @@ async function logRound(sessionComplete) {
     timeEngaged: parseFloat(S.r.timeEngaged.toFixed(2)),
     isSolved: S.r.isSolved,
     didSkip: S.r.didSkip,
-    sessionComplete,
     attemptCount: S.r.attemptCount,
     firstAnswerCorrect: S.r.firstAnswerCorrect,
     timeToFirstAttempt: S.r.timeToFirstAttempt,
@@ -2094,7 +2090,7 @@ function registerBeforeUnload() {
       roundNumber: S.currentRound + 1,
       puzzleId: S.r.puzzleId,
       timeEngaged: S.r.timeEngaged,
-      isSolved: false, didSkip: false, sessionComplete: false,
+      isSolved: false, didSkip: false,
       attemptCount: S.r.attemptCount,
       rageClicks: S.r.rageClicks, rapidGuesses: S.r.rapidGuesses,
       rawSubmissionTimestamps: S.r.rawSubmissionTimestamps,
@@ -2117,13 +2113,10 @@ function registerBeforeUnload() {
 
 async function showResults() {
   clearDraft();
-  // Persist break data (tracked in memory, never written after createUser)
-  updateUserField(S.userId, {
-    breaksTaken:    S.breaksTaken,
-    totalBreakTime: parseFloat(S.totalBreakTime.toFixed(2)),
-  });
-  // Mark all round logs for this user as sessionComplete — needed for
-  // leaderboard and multi-session users whose earlier rounds were logged false
+  // Append this session's break data as new entries in the arrays
+  appendUserArrayField(S.userId, 'breaksTaken',    S.breaksTaken);
+  appendUserArrayField(S.userId, 'totalBreakTime', parseFloat(S.totalBreakTime.toFixed(2)));
+  // Mark user as having completed all 5 puzzles
   markSessionComplete(S.userId);
   // No tab-away modal on results screen
   if (_tabHandler)  document.removeEventListener('visibilitychange', _tabHandler);
