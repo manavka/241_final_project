@@ -978,6 +978,8 @@ async function onStartChallenge() {
 // ════════════════════════════════════════════════════════════════════
 
 function showLabelCard(roundIdx) {
+  S.currentRound = roundIdx;
+  saveDraft();
   const roundNum = roundIdx + 1;
   const treatment = S.treatment;
   let seconds = 10;
