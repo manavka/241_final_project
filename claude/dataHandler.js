@@ -4,7 +4,7 @@
 import { db, auth } from './firebase-config.js';
 
 // Lazily loaded Firebase modules — only imported when db is non-null
-let _addDoc, _collection, _getDocs, _updateDoc, _doc, _query, _where, _getDoc, _signInAnonymously;
+let _addDoc, _collection, _getDocs, _updateDoc, _doc, _query, _where, _getDoc, _signInAnonymously, _arrayUnion;
 
 async function loadFirebase() {
   if (!db) return false;
@@ -19,7 +19,8 @@ async function loadFirebase() {
     _doc = fs.doc;
     _query = fs.query;
     _where = fs.where;
-    _getDoc = fs.getDoc; // Note: this is singular, for one doc
+    _getDoc = fs.getDoc;
+    _arrayUnion = fs.arrayUnion;
     _signInAnonymously = au.signInAnonymously;
     return true;
   } catch {
@@ -83,6 +84,28 @@ export async function updateUserField(userId, fields) {
     }
   } catch (e) {
     console.error(`Failed to query and update user ${userId}:`, e);
+  }
+}
+
+export async function appendUserArrayField(userId, field, value) {
+  const ok = await loadFirebase();
+  if (!ok) {
+    const key = 'userData_' + userId;
+    const existing = JSON.parse(localStorage.getItem(key) || '{}');
+    existing[field] = [...(existing[field] || []), value];
+    localStorage.setItem(key, JSON.stringify(existing));
+    return;
+  }
+  try {
+    const q = _query(_collection(db, 'users'), _where('userId', '==', userId));
+    const snap = await _getDocs(q);
+    if (!snap.empty) {
+      await writeWithRetry(() => _updateDoc(snap.docs[0].ref, { [field]: _arrayUnion(value) }), userId, 'arrayAppend');
+    } else {
+      console.warn(`Could not find user document for userId: ${userId} to append array field.`);
+    }
+  } catch (e) {
+    console.error(`Failed to append array field for user ${userId}:`, e);
   }
 }
 
