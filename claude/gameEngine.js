@@ -133,6 +133,8 @@ function saveDraft() {
     currentRound:     S.currentRound     || 0,
     surveyAnswers:    S.surveyAnswers     || {},
     sessionTimestamp: S.sessionTimestamp || new Date().toISOString(),
+    breaksTaken:      S.breaksTaken      || 0,
+    totalBreakTime:   S.totalBreakTime   || 0,
   }));
 }
 function clearDraft() { localStorage.removeItem('lpc_draft'); }
@@ -912,11 +914,13 @@ async function onStartChallenge() {
 
   if (resuming) {
     // Restore saved game state so round logs share the same userId
-    S.userId         = draft.userId;
-    S.puzzleOrder    = draft.puzzleOrder;
-    S.currentRound   = draft.currentRound;
-    S.resumeRound    = draft.currentRound + 1;  // 1-based to match roundNumber in gameLogs
+    S.userId           = draft.userId;
+    S.puzzleOrder      = draft.puzzleOrder;
+    S.currentRound     = draft.currentRound;
+    S.resumeRound      = draft.currentRound + 1;  // 1-based to match roundNumber in gameLogs
     S.sessionTimestamp = draft.sessionTimestamp || null;
+    S.breaksTaken      = draft.breaksTaken      || 0;
+    S.totalBreakTime   = draft.totalBreakTime   || 0;
   } else {
     // Fresh game — shuffle puzzles and start from round 0
     const shuffled = fisherYates([...PUZZLE_BANK]);
@@ -1077,13 +1081,17 @@ function showLabelCard(roundIdx) {
       if (!_paused) {
         _paused = true;
         _breakStart = Date.now();
-        S.breaksTaken++;
         pauseBtn.textContent = 'Resume →';
         pauseBtn.style.borderColor = 'rgba(167,139,250,0.70)';
         pauseBtn.style.color = 'var(--text)';
       } else {
         _paused = false;
-        if (_breakStart) { S.totalBreakTime += (Date.now() - _breakStart) / 1000; _breakStart = null; }
+        if (_breakStart) {
+          S.breaksTaken++;
+          S.totalBreakTime += (Date.now() - _breakStart) / 1000;
+          _breakStart = null;
+          saveDraft();
+        }
         pauseBtn.textContent = 'Take a Break ⏸';
         pauseBtn.style.borderColor = 'rgba(167,139,250,0.35)';
         pauseBtn.style.color = 'var(--lavender)';
