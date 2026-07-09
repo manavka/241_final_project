@@ -1,7 +1,7 @@
 ---
 title: "firestore_preprocessing"
 author: "Ken Isaka"
-date: "2026-07-07"
+date: "2026-07-08"
 output: html_document
 ---
 
@@ -11,7 +11,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Data Preprocessing
 
-Data preprocessing of .json file from Firestore (30 users, 152 game logs as of 2026-07-07).
+Data preprocessing of .json file from Firestore.
 
 ```{r load-and-flatten}
 # install.packages(c("jsonlite", "dplyr", "tidyr", "purrr"))
@@ -28,30 +28,44 @@ raw_data <- fromJSON("firestore_export.json", simplifyVector = FALSE)
 cat("Users:", length(raw_data$users), "\n")
 cat("GameLogs:", length(raw_data$gameLogs), "\n")
 
-# Flatten users
+# ── Flatten users ──────────────────────────────────────────────────────────────
 users_df <- tibble(
   document_id = names(raw_data$users),
   data = raw_data$users
 ) %>%
   unnest_wider(data)
 
-# Flatten gameLogs
+# List columns on users:
+#   puzzleOrder   — array of puzzle id strings  → comma-separated string
+#   resumeRounds  — array of round numbers (empty for single-session users) → comma-separated or NA
+#   breakLog      — array of {timestamp, duration} maps → derive breaksTaken + totalBreakTime scalars
+users_df <- users_df %>%
+  mutate(
+    puzzleOrder    = map_chr(puzzleOrder,
+                             ~ paste(.x, collapse = ",")),
+    resumeRounds   = map_chr(resumeRounds,
+                             ~ if (length(.x) == 0) NA_character_ else paste(.x, collapse = ",")),
+    breaksTaken    = map_int(breakLog,
+                             ~ if (is.null(.x)) 0L else length(.x)),
+    totalBreakTime = map_dbl(breakLog,
+                             ~ if (is.null(.x)) 0 else sum(map_dbl(.x, "duration"), na.rm = TRUE))
+  ) %>%
+  select(-breakLog)
+
+# ── Flatten gameLogs ───────────────────────────────────────────────────────────
 gamelogs_df <- tibble(
   document_id = names(raw_data$gameLogs),
   data = raw_data$gameLogs
 ) %>%
   unnest_wider(data)
 
-# puzzleOrder (users) and rawSubmissionTimestamps (gameLogs) are list columns.
-# Convert puzzleOrder to a comma-separated string for easier analysis.
-users_df <- users_df %>%
-  mutate(puzzleOrder = map_chr(puzzleOrder, ~ paste(.x, collapse = ",")))
-
-# rawSubmissionTimestamps kept as list; drop for master join to keep it tidy.
+# rawSubmissionTimestamps is a variable-length list; drop it for the master join.
 gamelogs_df <- gamelogs_df %>%
   select(-rawSubmissionTimestamps)
 
-# Join: drop treatment/isReplay from gameLogs (duplicated in users), then join on userId
+# ── Master join ────────────────────────────────────────────────────────────────
+# Drop treatment/isReplay from gameLogs (canonical copies live on users).
+# sessionComplete is on users (true once all 5 puzzles done), not on gamelogs.
 experiment_master <- gamelogs_df %>%
   select(-treatment, -isReplay) %>%
   left_join(users_df, by = "userId") %>%
