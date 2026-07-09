@@ -111,6 +111,29 @@ export async function appendUserArrayField(userId, field, value) {
 
 // ── gameLogs collection ───────────────────────────────────────────────────────
 
+export async function getUserGameLogs(userId) {
+  const ok = await loadFirebase();
+  if (!ok) {
+    // Collect from localStorage fallback
+    const logs = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(`gameLog_${userId}`)) {
+        try { logs.push(JSON.parse(localStorage.getItem(key))); } catch {}
+      }
+    }
+    return logs;
+  }
+  try {
+    const q = _query(_collection(db, 'gameLogs'), _where('userId', '==', userId));
+    const snap = await _getDocs(q);
+    return snap.docs.map(d => d.data());
+  } catch (e) {
+    console.warn('Failed to fetch prior game logs:', e);
+    return [];
+  }
+}
+
 export async function saveGameLog(logObject) {
   const ok = await loadFirebase();
   if (!ok) {

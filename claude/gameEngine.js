@@ -1,4 +1,4 @@
-import { signInAnon, createUser, saveGameLog, savePartialLog, updateHonestyCheck, updateUserField, appendUserArrayField, getLeaderboardScores } from './dataHandler.js';
+import { signInAnon, createUser, saveGameLog, savePartialLog, updateHonestyCheck, updateUserField, appendUserArrayField, getUserGameLogs, getLeaderboardScores } from './dataHandler.js';
 
 // ════════════════════════════════════════════════════════════════════
 // CONSTANTS
@@ -953,6 +953,13 @@ async function onStartChallenge() {
       // Update the existing user doc — don't create a duplicate
       updateUserField(S.userId, { multiSession: true });
       appendUserArrayField(S.userId, 'resumeRounds', S.resumeRound);
+      // Load prior rounds so the results screen scores all 5 rounds, not just this session
+      const priorLogs = await getUserGameLogs(S.userId);
+      priorLogs.forEach(log => {
+        if (!S.completedLogs.find(l => l.roundNumber === log.roundNumber)) {
+          S.completedLogs.push(log);
+        }
+      });
     } else {
       const userObj = {
         userId: S.userId,
