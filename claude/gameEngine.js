@@ -1,4 +1,4 @@
-import { signInAnon, createUser, saveGameLog, savePartialLog, updateHonestyCheck, updateUserField, appendUserArrayField, getUserGameLogs, getLeaderboardScores } from './dataHandler.js';
+import { signInAnon, createUser, saveGameLog, savePartialLog, updateHonestyCheck, updateUserField, appendUserArrayField, getUserGameLogs, markSessionComplete, getLeaderboardScores } from './dataHandler.js';
 
 // ════════════════════════════════════════════════════════════════════
 // CONSTANTS
@@ -2108,7 +2108,15 @@ function registerBeforeUnload() {
 // ════════════════════════════════════════════════════════════════════
 
 async function showResults() {
-  clearDraft(); // All rounds done — next person on this device starts fresh
+  clearDraft();
+  // Persist break data (tracked in memory, never written after createUser)
+  updateUserField(S.userId, {
+    breaksTaken:    S.breaksTaken,
+    totalBreakTime: parseFloat(S.totalBreakTime.toFixed(2)),
+  });
+  // Mark all round logs for this user as sessionComplete — needed for
+  // leaderboard and multi-session users whose earlier rounds were logged false
+  markSessionComplete(S.userId);
   // No tab-away modal on results screen
   if (_tabHandler)  document.removeEventListener('visibilitychange', _tabHandler);
   if (_blurHandler)  window.removeEventListener('blur', _blurHandler);

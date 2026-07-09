@@ -111,6 +111,30 @@ export async function appendUserArrayField(userId, field, value) {
 
 // ── gameLogs collection ───────────────────────────────────────────────────────
 
+export async function markSessionComplete(userId) {
+  const ok = await loadFirebase();
+  if (!ok) {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(`gameLog_${userId}`)) {
+        try {
+          const log = JSON.parse(localStorage.getItem(key));
+          log.sessionComplete = true;
+          localStorage.setItem(key, JSON.stringify(log));
+        } catch {}
+      }
+    }
+    return;
+  }
+  try {
+    const q = _query(_collection(db, 'gameLogs'), _where('userId', '==', userId));
+    const snap = await _getDocs(q);
+    await Promise.all(snap.docs.map(d => _updateDoc(d.ref, { sessionComplete: true })));
+  } catch (e) {
+    console.error('Failed to mark session complete:', e);
+  }
+}
+
 export async function getUserGameLogs(userId) {
   const ok = await loadFirebase();
   if (!ok) {
