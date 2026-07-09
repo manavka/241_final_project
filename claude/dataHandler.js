@@ -195,16 +195,19 @@ export async function getLeaderboardScores() {
 }
 
 function aggregateScores(allLogs) {
-  // Group by userId, deduplicate by roundNumber (keep latest log per round)
+  // Group by userId; for each roundNumber keep the completed log if one exists
   const byUser = {};
   for (const log of allLogs) {
     if (!byUser[log.userId]) byUser[log.userId] = {};
-    byUser[log.userId][log.roundNumber] = log;
+    const rn = log.roundNumber;
+    const existing = byUser[log.userId][rn];
+    if (!existing || log.isSolved || log.didSkip) byUser[log.userId][rn] = log;
   }
   const scores = [];
   for (const [uid, byRound] of Object.entries(byUser)) {
     const uniqueLogs = Object.values(byRound);
     if (uniqueLogs.length !== 5) continue;
+    if (!uniqueLogs.every(l => l.isSolved || l.didSkip)) continue;
     const total = Math.max(0, uniqueLogs.reduce((sum, l) => sum + calcRoundScore(l), 0));
     scores.push({ userId: uid, totalScore: total });
   }
@@ -218,12 +221,15 @@ function collectLocalScores() {
     if (!key.startsWith('gameLog_')) continue;
     const log = JSON.parse(localStorage.getItem(key));
     if (!byUser[log.userId]) byUser[log.userId] = {};
-    byUser[log.userId][log.roundNumber] = log;
+    const rn = log.roundNumber;
+    const existing = byUser[log.userId][rn];
+    if (!existing || log.isSolved || log.didSkip) byUser[log.userId][rn] = log;
   }
   const result = [];
   for (const [uid, byRound] of Object.entries(byUser)) {
     const uniqueLogs = Object.values(byRound);
     if (uniqueLogs.length !== 5) continue;
+    if (!uniqueLogs.every(l => l.isSolved || l.didSkip)) continue;
     result.push({ userId: uid, totalScore: Math.max(0, uniqueLogs.reduce((s, l) => s + calcRoundScore(l), 0)) });
   }
   return result;
