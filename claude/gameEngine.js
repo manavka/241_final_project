@@ -182,7 +182,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   const _urlP = new URLSearchParams(window.location.search);
   if (_urlP.get('source') === 'prolific' || _urlP.get('PROLIFIC_PID')) {
     S.recruitmentSource = 'prolific';
-    if (_urlP.get('PROLIFIC_PID')) S.prolificPid = _urlP.get('PROLIFIC_PID');
+    if (_urlP.get('PROLIFIC_PID')) S.prolificPid   = _urlP.get('PROLIFIC_PID');
+    if (_urlP.get('STUDY_ID'))     S.studyId       = _urlP.get('STUDY_ID');
+    if (_urlP.get('SESSION_ID'))   S.sessionId     = _urlP.get('SESSION_ID');
   }
 
   // Restore admin badge if already set
@@ -971,6 +973,8 @@ async function onStartChallenge() {
         isReplay: S.isReplay,
         recruitmentSource: S.recruitmentSource || 'organic',
         ...(S.prolificPid ? { prolificPid: S.prolificPid } : {}),
+        ...(S.studyId     ? { studyId:     S.studyId }     : {}),
+        ...(S.sessionId   ? { sessionId:   S.sessionId }   : {}),
         multiSession: false,
         resumeRounds: [],
         timestamp: S.sessionTimestamp || new Date().toISOString(),
