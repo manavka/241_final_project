@@ -178,6 +178,11 @@ document.addEventListener('keydown', e => {
 document.addEventListener('DOMContentLoaded', async () => {
   S.userId = await signInAnon();
 
+  // Flag Prolific participants via ?source=prolific
+  if (new URLSearchParams(window.location.search).get('source') === 'prolific') {
+    S.recruitmentSource = 'prolific';
+  }
+
   // Restore admin badge if already set
   if (isAdminMode()) setAdminBadge(true);
 
@@ -962,6 +967,7 @@ async function onStartChallenge() {
         treatment: S.treatment,
         ipAddress: S.ipAddress,
         isReplay: S.isReplay,
+        recruitmentSource: S.recruitmentSource || 'organic',
         multiSession: false,
         resumeRounds: [],
         timestamp: S.sessionTimestamp || new Date().toISOString(),
