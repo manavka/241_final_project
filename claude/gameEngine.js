@@ -178,9 +178,11 @@ document.addEventListener('keydown', e => {
 document.addEventListener('DOMContentLoaded', async () => {
   S.userId = await signInAnon();
 
-  // Flag Prolific participants via ?source=prolific
-  if (new URLSearchParams(window.location.search).get('source') === 'prolific') {
+  // Capture Prolific params
+  const _urlP = new URLSearchParams(window.location.search);
+  if (_urlP.get('source') === 'prolific' || _urlP.get('PROLIFIC_PID')) {
     S.recruitmentSource = 'prolific';
+    if (_urlP.get('PROLIFIC_PID')) S.prolificPid = _urlP.get('PROLIFIC_PID');
   }
 
   // Restore admin badge if already set
@@ -968,6 +970,7 @@ async function onStartChallenge() {
         ipAddress: S.ipAddress,
         isReplay: S.isReplay,
         recruitmentSource: S.recruitmentSource || 'organic',
+        ...(S.prolificPid ? { prolificPid: S.prolificPid } : {}),
         multiSession: false,
         resumeRounds: [],
         timestamp: S.sessionTimestamp || new Date().toISOString(),
