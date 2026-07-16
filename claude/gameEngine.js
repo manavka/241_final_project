@@ -2192,9 +2192,13 @@ async function showResults() {
           <p style="font-family:'Space Grotesk',sans-serif;font-size:14px;color:var(--text-2);line-height:1.5;">Your response has been recorded. We really appreciate your honesty — it makes our research better.</p>
         `;
         setTimeout(async () => {
-          resetSession();
-          S.userId = await signInAnon();
-          showLanding();
+          if (S.recruitmentSource === 'prolific') {
+            window.location.href = 'https://app.prolific.com/submissions/complete?cc=CV94953Z';
+          } else {
+            resetSession();
+            S.userId = await signInAnon();
+            showLanding();
+          }
         }, 2200);
       });
       honBtns.appendChild(btn);
