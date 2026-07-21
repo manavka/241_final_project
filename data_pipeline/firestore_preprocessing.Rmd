@@ -1,8 +1,11 @@
 ---
-title: "firestore_preprocessing"
-author: "Ken Isaka"
-date: "2026-07-08"
+title: "Puzzle Engagement Experiment — Data Pipeline & Analysis"
+author: 
+date: "`r Sys.Date()`"
 output: html_document
+editor_options: 
+  markdown: 
+    wrap: 72
 ---
 
 ```{r setup, include=FALSE}
@@ -14,13 +17,16 @@ knitr::opts_chunk$set(echo = TRUE)
 Data preprocessing of .json file from Firestore.
 
 ```{r load-and-flatten}
-# install.packages(c("jsonlite", "dplyr", "tidyr", "purrr"))
+# install.packages(c("jsonlite", "dplyr", "tidyr", "purrr", "lme4", "lmtest", "pwr"))
 
 library(jsonlite)
 library(dplyr)
 library(tidyr)
 library(purrr)
+library(lme4)
+library(clubSandwich)
 library(lmtest)
+library(pwr)
 
 # Load raw JSON — simplifyVector = FALSE preserves irregular arrays as lists
 raw_data <- fromJSON("firestore_export.json", simplifyVector = FALSE)
@@ -60,15 +66,23 @@ gamelogs_df <- tibble(
   unnest_wider(data)
 
 # rawSubmissionTimestamps is a variable-length list; drop it for the master join.
+# Filter replays — isReplay == TRUE marks repeated attempts after completion.
+# Exception: sharedDevice == "new_player" means a different person on the same household
+# device; the app marks their gamelogs isReplay=TRUE but they are genuinely new participants.
+new_player_ids <- users_df %>%
+  filter(!is.na(sharedDevice) & sharedDevice == "new_player") %>%
+  pull(userId)
+
 gamelogs_df <- gamelogs_df %>%
-  select(-rawSubmissionTimestamps)
+  select(-rawSubmissionTimestamps) %>%
+  filter(is.na(isReplay) | isReplay == FALSE | userId %in% new_player_ids)
 
 # ── Master join ────────────────────────────────────────────────────────────────
 # Drop treatment/isReplay from gameLogs (canonical copies live on users).
 # sessionComplete is on users (true once all 5 puzzles done), not on gamelogs.
 experiment_master <- gamelogs_df %>%
   select(-treatment, -isReplay) %>%
-  left_join(users_df, by = "userId") %>%
+  left_join(users_df %>% arrange(userId, desc(sessionComplete)) %>% distinct(userId, .keep_all = TRUE), by = "userId") %>%
   select(-starts_with("document_id"))
 
 glimpse(experiment_master)
@@ -79,55 +93,386 @@ glimpse(experiment_master)
 Check randomization frequencies across treatment arms.
 
 ```{r balance-check}
-cat("--- Treatment Assignment ---\n")
-treatment_counts <- experiment_master %>%
-  distinct(userId, .keep_all = TRUE) %>%
-  count(treatment)
-print(treatment_counts)
+user_level <- experiment_master %>%
+  distinct(userId, .keep_all = TRUE)
 
-cat("\n--- Covariate Balance ---\n")
-balance_check <- experiment_master %>%
-  distinct(userId, .keep_all = TRUE) %>%
+user_level %>%
+  count(treatment) %>%
+  kable(col.names = c("Treatment", "N"), caption = "Treatment Assignment")
+
+user_level %>%
   group_by(treatment) %>%
   summarize(
-    n_users           = n(),
-    avg_age           = mean(age, na.rm = TRUE),
-    avg_quant_exposure = mean(quantitativeExposure, na.rm = TRUE),
-    avg_puzzle_skill  = mean(puzzleSkill, na.rm = TRUE),
-    avg_puzzle_enjoy  = mean(puzzleEnjoyment, na.rm = TRUE),
-    avg_energy        = mean(energyLevel, na.rm = TRUE),
-    pct_desktop       = mean(deviceType == "Desktop", na.rm = TRUE)
-  )
-print(balance_check)
+    N                  = n(),
+    Age                = round(mean(age, na.rm = TRUE), 1),
+    `Quant Exposure`   = round(mean(quantitativeExposure, na.rm = TRUE), 2),
+    `Puzzle Skill`     = round(mean(puzzleSkill, na.rm = TRUE), 2),
+    `Puzzle Enjoyment` = round(mean(puzzleEnjoyment, na.rm = TRUE), 2),
+    `Energy Level`     = round(mean(energyLevel, na.rm = TRUE), 2),
+    `% Desktop`        = round(mean(deviceType == "Desktop", na.rm = TRUE) * 100, 1)
+  ) %>%
+  kable(caption = "Covariate Balance by Treatment")
 
-cat("\n--- Gender Distribution by Treatment ---\n")
-gender_dist <- experiment_master %>%
-  distinct(userId, .keep_all = TRUE) %>%
+user_level %>%
   count(treatment, gender) %>%
   group_by(treatment) %>%
-  mutate(pct = round(n / sum(n), 2))
-print(gender_dist)
+  mutate(pct = paste0(round(n / sum(n) * 100, 0), "%")) %>%
+  kable(col.names = c("Treatment", "Gender", "N", "%"), caption = "Gender by Treatment")
 ```
 
 ## Outcome Summary
 
 ```{r outcome-summary}
-cat("--- Solve Rate by Treatment ---\n")
-outcome_summary <- experiment_master %>%
+experiment_master %>%
   group_by(treatment) %>%
   summarize(
-    n_rounds          = n(),
-    solve_rate        = mean(isSolved, na.rm = TRUE),
-    avg_time_engaged  = mean(timeEngaged, na.rm = TRUE),
-    avg_attempts      = mean(attemptCount, na.rm = TRUE),
-    skip_rate         = mean(didSkip, na.rm = TRUE),
-    avg_rage_clicks   = mean(rageClicks, na.rm = TRUE)
-  )
-print(outcome_summary)
+    `Rounds`          = n(),
+    `Solve Rate`      = paste0(round(mean(isSolved, na.rm = TRUE) * 100, 1), "%"),
+    `Avg Time (s)`    = round(mean(timeEngaged, na.rm = TRUE), 1),
+    `Avg Attempts`    = round(mean(attemptCount, na.rm = TRUE), 2),
+    `Skip Rate`       = paste0(round(mean(didSkip, na.rm = TRUE) * 100, 1), "%"),
+    `Avg Rage Clicks` = round(mean(rageClicks, na.rm = TRUE), 2)
+  ) %>%
+  kable(caption = "Outcome Summary by Treatment")
 ```
 
+## Data Cleaning
 
-```{r regression}
-m1 <- lm(timeEngaged ~ treatment + puzzleSkill + age + quantitativeExposure + puzzleFrequency, data = experiment_master)
-coeftest(m1)
+Session-level and round-level exclusions applied in order below.
+
+```{r clean-data}
+# ── Exclusion criteria ─────────────────────────────────────────────────────────
+# Session-level (user excluded entirely):
+#   S1. sessionComplete == FALSE: only keep fully finished 5-round sessions
+#   S2. age < 18: adults only
+#   S3. sharedDevice == "returning": duplicate session from same device
+#   S4. prolificRejected == TRUE: flagged by Prolific platform
+#   S5. total tabSwitchTimePaused > 600s across session (verified away from browser)
+#   S6. any round: didSkip + tabSwitchTimePaused == 0 + timeEngaged > per-puzzle p97
+#       of skip distribution — walked away without switching tabs, came back and skipped
+#   S7. 3+ zero-attempt skips with timeEngaged in 30–35s — skip button unlocks at 30s;
+#       clicking immediately on 3+ puzzles signals waiting out the timer, not genuine engagement
+
+# Per-puzzle p97 skip-time thresholds (computed from all skip rounds pre-cleaning)
+skip_p97 <- experiment_master %>%
+  filter(didSkip == TRUE) %>%
+  group_by(puzzleId) %>%
+  summarize(p97_skip = quantile(timeEngaged, 0.97), .groups = "drop")
+
+# S6: users with at least one idle-walk-away skip round
+idle_skip_users <- experiment_master %>%
+  left_join(skip_p97, by = "puzzleId") %>%
+  filter(didSkip == TRUE &
+           (is.na(tabSwitchTimePaused) | tabSwitchTimePaused == 0) &
+           timeEngaged > p97_skip) %>%
+  pull(userId) %>%
+  unique()
+
+# S7: users with 5 zero-attempt skips at 30–35s (skip button unlocks at 30s; immediate click = timer-waiting)
+cluster_skip_users <- experiment_master %>%
+  filter(didSkip == TRUE & timeEngaged >= 30 & timeEngaged <= 35) %>%
+  group_by(userId) %>%
+  summarize(n_cluster_skips = n(), .groups = "drop") %>%
+  filter(n_cluster_skips == 5) %>%
+  pull(userId)
+
+# Compute per-user total tab-switch pause time (S5)
+user_tab_paused <- experiment_master %>%
+  filter(isSolved | didSkip) %>%
+  group_by(userId) %>%
+  summarize(total_tab_paused = sum(tabSwitchTimePaused, na.rm = TRUE), .groups = "drop")
+
+clean <- experiment_master %>%
+  filter(sessionComplete == TRUE) %>%
+  filter(age >= 18) %>%
+  filter(is.na(sharedDevice) | sharedDevice == "new_player") %>%
+  filter(is.na(prolificRejected) | prolificRejected != TRUE) %>%
+  filter(!userId %in% idle_skip_users) %>%
+  filter(!userId %in% cluster_skip_users) %>%
+  filter(isSolved | didSkip) %>%
+  left_join(user_tab_paused, by = "userId") %>%
+  filter(total_tab_paused <= 600) %>%
+  select(-total_tab_paused) %>%
+  mutate(
+    logTE      = log(timeEngaged + 1),
+    treatment  = relevel(factor(treatment), ref = "no_label"),
+    puzzleId   = relevel(factor(puzzleId),  ref = "puzzle_01"),
+    deviceType = factor(deviceType)
+  )
+
+cat("Idle-walk-away sessions excluded (S6):", length(idle_skip_users), "\n")
+cat("Cluster-skip sessions excluded (S7):", length(cluster_skip_users), "\n")
+cat("Clean rounds:", nrow(clean), "\n")
+cat("Complete users:", n_distinct(clean$userId), "\n")
+
+clean %>% count(treatment) %>% kable(col.names = c("Treatment", "Rounds"), caption = "Rounds per Treatment")
+
+clean %>%
+  group_by(puzzleId, treatment) %>%
+  summarize(n = n(), skip_pct = paste0(round(mean(didSkip) * 100, 0), "%"), .groups = "drop") %>%
+  pivot_wider(names_from = treatment, values_from = c(n, skip_pct)) %>%
+  arrange(puzzleId) %>%
+  kable(caption = "Skip Rate per Puzzle by Treatment")
+```
+
+## Exclusion Flags: AI Assistance Detection
+
+Two-tier flag applied after deduplication on (userId, puzzleId,
+roundNumber). Hard puzzles are puzzle_01 (number sequence), puzzle_02
+(alphabet wheel), puzzle_05 (tile sequence). Thresholds are empirical
+percentiles of solve-time distribution on first-attempt solves.
+
+Rules: R1. Self-reported: honestyCheck == "assisted" R2a. Any single
+hard puzzle solved in ≤ p5 time on first attempt (puzzle_01 ≤ 21s,
+puzzle_02 ≤ 41s, puzzle_05 ≤ 23s) R2b. 2+ hard puzzles solved in ≤ p10
+time on first attempt (puzzle_01 ≤ 30s, puzzle_02 ≤ 58s, puzzle_05 ≤
+37s)
+
+```{r exclusion-flags}
+# Deduplicate: keep one row per user × puzzle × round
+# Smarter dedup: prefer completed rows (isSolved | didSkip) over incomplete ones
+dedup <- clean %>%
+  arrange(userId, puzzleId, roundNumber, desc(isSolved | didSkip), didSkip) %>%
+  distinct(userId, puzzleId, roundNumber, .keep_all = TRUE)
+
+hard_puzzles <- c("puzzle_01", "puzzle_02", "puzzle_05")
+
+# Solve-time percentile thresholds on hard puzzles (computed on clean data)
+# p5  — flag any single hard puzzle solved below this time on first attempt (R2a)
+# p10 — flag if 2+ hard puzzles below this time on first attempt (R2b)
+p5_thresh  <- c(puzzle_01 = 21, puzzle_02 = 41, puzzle_05 = 23)
+p10_thresh <- c(puzzle_01 = 30, puzzle_02 = 58, puzzle_05 = 37)
+
+ai_flags <- dedup %>%
+  mutate(
+    below_p5  = puzzleId %in% hard_puzzles & isSolved & attemptCount == 1 &
+                ((puzzleId == "puzzle_01" & timeEngaged <= p5_thresh["puzzle_01"]) |
+                 (puzzleId == "puzzle_02" & timeEngaged <= p5_thresh["puzzle_02"]) |
+                 (puzzleId == "puzzle_05" & timeEngaged <= p5_thresh["puzzle_05"])),
+    below_p10 = puzzleId %in% hard_puzzles & isSolved & attemptCount == 1 &
+                ((puzzleId == "puzzle_01" & timeEngaged <= p10_thresh["puzzle_01"]) |
+                 (puzzleId == "puzzle_02" & timeEngaged <= p10_thresh["puzzle_02"]) |
+                 (puzzleId == "puzzle_05" & timeEngaged <= p10_thresh["puzzle_05"]))
+  ) %>%
+  group_by(userId, prolificPid, treatment) %>%
+  summarize(
+    flag_R1  = any(honestyCheck == "assisted", na.rm = TRUE),  # self-reported
+    flag_R2a = sum(below_p5,  na.rm = TRUE) >= 1,             # any p5 blitz
+    flag_R2b = sum(below_p10, na.rm = TRUE) >= 2,             # 2+ p10 blitz
+    ai_flagged = flag_R1 | flag_R2a | flag_R2b,
+    .groups = "drop"
+  )
+
+# Manual overrides: participants reviewed and cleared despite automated flag
+# 6977b9ea4ad70bb8a33c9b2d (local_lhde027og): p01 20s/a1 (1s below p5), p05 35s/a1 (2s below p10)
+#   — margins too tight to be confident; struggled on p02 (118s/a3, tab switch); solo self-report
+manual_clear <- c("local_lhde027og")
+
+all_flags <- ai_flags %>%
+  mutate(any_flag = ai_flagged & !userId %in% manual_clear)
+
+cat("=== Exclusion summary ===\n")
+cat("R1  Admitted assistance:         ", sum(ai_flags$flag_R1),  "\n")
+cat("R2a Any hard puzzle below p5:    ", sum(ai_flags$flag_R2a), "\n")
+cat("R2b 2+ hard puzzles below p10:   ", sum(ai_flags$flag_R2b), "\n")
+cat("TOTAL excluded (R1|R2a|R2b):     ", sum(all_flags$any_flag), "\n")
+
+# Final analysis dataset
+# Dedup within (userId, puzzleId, roundNumber): prefer completed row (isSolved | didSkip)
+df <- clean %>%
+  left_join(all_flags %>% select(userId, any_flag), by = "userId") %>%
+  filter(!any_flag) %>%
+  mutate(
+    zero_att_skip = as.integer(didSkip & attemptCount == 0),
+    logAtt        = log(attemptCount + 1)
+  ) %>%
+  arrange(userId, puzzleId, roundNumber, desc(isSolved | didSkip), didSkip) %>%
+  distinct(userId, puzzleId, roundNumber, .keep_all = TRUE)
+
+cat("\nFinal dataset: ", n_distinct(df$userId), "users |", nrow(df), "rounds\n")
+cat("Rounds per treatment:\n")
+print(count(df, treatment))
+```
+
+## Primary Model 1: log(timeEngaged)
+
+Mixed effects model with random intercept per user (rounds nested within
+users). Reference: treatment = no_label, puzzleId = puzzle_01.
+Cluster-robust SEs (CR1, Satterthwaite df) account for within-user
+correlation. Lean spec (treatment + puzzleId + puzzleSkill) is primary;
+full covariate model is robustness check.
+
+```{r primary-model}
+run_primary <- function(data) {
+  # Lean model
+  m_lean    <- lmer(logTE ~ treatment + puzzleId + puzzleSkill + (1 | userId),
+                    data = data, REML = FALSE)
+  vcov_lean <- vcovCR(m_lean, cluster = data$userId, type = "CR1")
+  rt_lean   <- coef_test(m_lean, vcov = vcov_lean, test = "Satterthwaite")
+  
+  # Full model
+  m_full    <- lmer(logTE ~ treatment + puzzleId +
+                      puzzleSkill + age + quantitativeExposure + energyLevel +
+                      deviceType + tabSwitchTimePaused + (1 | userId),
+                    data = data, REML = FALSE)
+  vcov_full <- vcovCR(m_full, cluster = data$userId, type = "CR1")
+  rt_full   <- coef_test(m_full, vcov = vcov_full, test = "Satterthwaite")
+  
+  trt_lean <- grepl("^treatment", rt_lean$Coef)
+  trt_full <- grepl("^treatment", rt_full$Coef)
+  
+  bind_rows(
+    data.frame(model = "Lean", term = rt_lean$Coef[trt_lean],
+               est = round(rt_lean$beta[trt_lean], 3),
+               se  = round(rt_lean$SE[trt_lean], 3),
+               t   = round(rt_lean$tstat[trt_lean], 3),
+               p   = round(rt_lean$p_Satt[trt_lean], 4)),
+    data.frame(model = "Full", term = rt_full$Coef[trt_full],
+               est = round(rt_full$beta[trt_full], 3),
+               se  = round(rt_full$SE[trt_full], 3),
+               t   = round(rt_full$tstat[trt_full], 3),
+               p   = round(rt_full$p_Satt[trt_full], 4))
+  )
+}
+
+bind_rows(
+  run_primary(df)          %>% mutate(sample = "Full"),
+  run_primary(df_prolific) %>% mutate(sample = "Prolific"),
+  run_primary(df_organic)  %>% mutate(sample = "Organic")
+) %>%
+  select(sample, model, term, est, se, t, p) %>%
+  arrange(term, model, sample) %>%
+  mutate(p_adj = round(p.adjust(p, method = "BH"), 4)) %>%
+  kable(caption = "Primary Model (logTE): Lean and Full by Sample (cluster-robust SEs)")
+```
+
+## Primary Model 2: Zero-Attempt Skip Rate
+
+Zero-attempt skips (didSkip + attemptCount == 0) measure cold
+disengagement — giving up without trying. This is the primary binary
+outcome. Normal-approximation z-tests (adequate with n \> 200).
+
+```{r zero-att-skip-model}
+run_zas <- function(data) {
+  m <- glmer(
+    zero_att_skip ~ treatment + puzzleId + scale(puzzleSkill) + (1 | userId),
+    data = data, family = binomial,
+    control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 2e5))
+  )
+  cs   <- coef(summary(m))
+  rows <- grep("^treatment", rownames(cs))
+  data.frame(
+    term = rownames(cs)[rows],
+    OR   = round(exp(cs[rows, "Estimate"]), 3),
+    z    = round(cs[rows, "z value"], 3),
+    p    = round(cs[rows, "Pr(>|z|)"], 4)
+  )
+}
+
+df_prolific <- df %>% filter(!is.na(prolificPid))
+df_organic  <- df %>% filter(is.na(prolificPid))
+
+zas_full     <- run_zas(df)          %>% mutate(sample = "Full")
+zas_prolific <- run_zas(df_prolific) %>% mutate(sample = "Prolific")
+zas_organic  <- run_zas(df_organic)  %>% mutate(sample = "Organic")
+
+bind_rows(zas_prolific, zas_organic, zas_full) %>%
+  select(sample, term, OR, z, p) %>%
+  arrange(term, sample) %>%
+  kable(caption = "Zero-Attempt Skip Model: OR by Sample (exploratory; raw p-values)")
+```
+
+## Consistency Check: Attempt Count Among Skippers
+
+Among rounds that ended in a skip, did the label change how hard people
+tried before giving up? Complements the zero-att skip finding:
+easy_label → more attempts before quitting (not just fewer cold quits).
+Outcome: log(attemptCount + 1). Models use cluster-robust SEs.
+
+```{r att-skippers}
+# All puzzles
+df_skip <- df %>% filter(didSkip == TRUE, puzzleId != "puzzle_04")
+cat("Skipped rounds (excl. puzzle_04):", nrow(df_skip), "from", n_distinct(df_skip$userId), "users\n")
+
+m_att_all  <- lmer(logAtt ~ treatment + puzzleId + puzzleSkill + (1 | userId),
+                   data = df_skip, REML = FALSE)
+rv_att_all <- vcovCR(m_att_all, cluster = df_skip$userId, type = "CR1")
+rt_att_all <- coef_test(m_att_all, vcov = rv_att_all, test = "Satterthwaite")
+trt_a      <- grepl("treatment", rt_att_all$Coef)
+
+data.frame(
+  Estimate = round(rt_att_all$beta[trt_a], 4),
+  SE       = round(rt_att_all$SE[trt_a], 4),
+  t        = round(rt_att_all$tstat[trt_a], 3),
+  p_Satt   = round(rt_att_all$p_Satt[trt_a], 4),
+  row.names = rt_att_all$Coef[trt_a]
+) %>% kable(caption = "log(attempts+1) among skippers — all hard/medium puzzles (exploratory)")
+
+# Hard number sequences only (puzzle_01 + puzzle_05)
+df_hard_skip <- df %>% filter(puzzleId %in% c("puzzle_01", "puzzle_05"), didSkip == TRUE)
+cat("\nHard puzzle (p01+p05) skipped rounds:", nrow(df_hard_skip),
+    "from", n_distinct(df_hard_skip$userId), "users\n")
+
+m_att_hard  <- lmer(logAtt ~ treatment + puzzleId + puzzleSkill + (1 | userId),
+                    data = df_hard_skip, REML = FALSE)
+rv_att_hard <- vcovCR(m_att_hard, cluster = df_hard_skip$userId, type = "CR1")
+rt_att_hard <- coef_test(m_att_hard, vcov = rv_att_hard, test = "Satterthwaite")
+trt_h       <- grepl("treatment", rt_att_hard$Coef)
+
+data.frame(
+  Estimate = round(rt_att_hard$beta[trt_h], 4),
+  SE       = round(rt_att_hard$SE[trt_h], 4),
+  t        = round(rt_att_hard$tstat[trt_h], 3),
+  p_Satt   = round(rt_att_hard$p_Satt[trt_h], 4),
+  row.names = rt_att_hard$Coef[trt_h]
+) %>% kable(caption = "log(attempts+1) among skippers — puzzle_01 + puzzle_05 only (exploratory)")
+
+df_hard_skip %>%
+  group_by(treatment, puzzleId) %>%
+  summarize(n = n(), mean_att = round(mean(attemptCount), 2),
+            pct_zero_att = round(mean(attemptCount == 0) * 100, 1), .groups = "drop") %>%
+  arrange(puzzleId, treatment) %>%
+  kable(caption = "Raw means — avg attempts before skip on hard puzzles")
+```
+
+## Robustness: Overall Skip Rate & Solve Rate
+
+```{r robustness-models}
+# Overall skip rate
+m_skip <- suppressWarnings(glmer(
+  didSkip ~ treatment + puzzleId + puzzleSkill + (1 | userId),
+  data = df, family = binomial, control = glmerControl(optimizer = "bobyqa")
+))
+cs_skip <- coef(summary(m_skip))
+cat("--- Overall skip (didSkip) ---\n")
+for (r in c("treatmenteasy_label", "treatmenthard_label"))
+  cat(sprintf("  %s: OR=%.3f  p=%.4f\n", r, exp(cs_skip[r, "Estimate"]),
+              2 * pnorm(abs(cs_skip[r, "z value"]), lower.tail = FALSE)))
+
+# Solve rate
+m_solve <- suppressWarnings(glmer(
+  isSolved ~ treatment + puzzleId + puzzleSkill + (1 | userId),
+  data = df, family = binomial, control = glmerControl(optimizer = "bobyqa")
+))
+cs_solve <- coef(summary(m_solve))
+cat("\n--- Solve rate (isSolved) ---\n")
+for (r in c("treatmenteasy_label", "treatmenthard_label"))
+  cat(sprintf("  %s: OR=%.3f  p=%.4f\n", r, exp(cs_solve[r, "Estimate"]),
+              2 * pnorm(abs(cs_solve[r, "z value"]), lower.tail = FALSE)))
+
+# logTE among solvers only
+clean_solved <- df %>% filter(isSolved == TRUE)
+m_solved <- lmer(logTE ~ treatment + puzzleId + puzzleSkill + (1 | userId),
+                 data = clean_solved, REML = FALSE)
+rv_sol <- vcovCR(m_solved, cluster = clean_solved$userId, type = "CR1")
+rt_sol <- coef_test(m_solved, vcov = rv_sol, test = "Satterthwaite")
+trt_s <- grepl("treatment", rt_sol$Coef)
+cat("\n--- logTE among solved rounds only ---\n")
+print(data.frame(
+  Estimate = round(rt_sol$beta[trt_s], 4),
+  SE       = round(rt_sol$SE[trt_s], 4),
+  t        = round(rt_sol$tstat[trt_s], 3),
+  p_Satt   = round(rt_sol$p_Satt[trt_s], 4),
+  row.names = rt_sol$Coef[trt_s]
+))
 ```
