@@ -27,6 +27,7 @@ library(lme4)
 library(clubSandwich)
 library(lmtest)
 library(pwr)
+library(knitr)
 
 # Load raw JSON — simplifyVector = FALSE preserves irregular arrays as lists
 raw_data <- fromJSON("firestore_export.json", simplifyVector = FALSE)
@@ -85,8 +86,63 @@ experiment_master <- gamelogs_df %>%
   left_join(users_df %>% arrange(userId, desc(sessionComplete)) %>% distinct(userId, .keep_all = TRUE), by = "userId") %>%
   select(-starts_with("document_id"))
 
+# Remove personally identifying information
+#experiment_master <- experiment_master %>%
+#  select(-any_of(c(
+#    "ipAddress",
+#    "studyId",
+#    "sessionId"
+#  )))
+
 glimpse(experiment_master)
 ```
+
+```{r}
+# One row per randomized participant
+participant_df <- users_df %>%
+  arrange(userId, desc(sessionComplete)) %>%
+  distinct(userId, .keep_all = TRUE) %>%
+  select(-any_of(c(
+    "ipAddress",
+    "prolificPid",
+    "studyId",
+    "sessionId"
+  )))
+
+# Overall participation and completion
+participant_df %>%
+  summarise(
+    user_documents = nrow(users_df),
+    unique_participants = n(),
+    completed = sum(sessionComplete == TRUE, na.rm = TRUE),
+    incomplete = sum(sessionComplete == FALSE, na.rm = TRUE),
+    missing_completion = sum(is.na(sessionComplete))
+  )
+
+# Randomization and completion by treatment
+participant_df %>%
+  count(treatment, sessionComplete)
+
+# Number of rounds recorded per participant
+round_counts <- experiment_master %>%
+  group_by(userId) %>%
+  summarise(
+    logged_rounds = n_distinct(roundNumber),
+    game_log_rows = n(),
+    .groups = "drop"
+  )
+
+participant_check <- participant_df %>%
+  left_join(round_counts, by = "userId") %>%
+  mutate(
+    logged_rounds = replace_na(logged_rounds, 0L),
+    game_log_rows = replace_na(game_log_rows, 0L)
+  )
+
+participant_check %>%
+  count(treatment, sessionComplete, logged_rounds)
+```
+
 
 ## Covariate Balance Check
 
@@ -118,7 +174,130 @@ user_level %>%
   group_by(treatment) %>%
   mutate(pct = paste0(round(n / sum(n) * 100, 0), "%")) %>%
   kable(col.names = c("Treatment", "Gender", "N", "%"), caption = "Gender by Treatment")
+
+
+
+
 ```
+
+## Attrition
+```{r}
+# ── Attrition by treatment ────────────────────────────────────────────────────
+
+# Count returning/replay sessions excluded from the attrition denominator
+returning_exclusions <- users_df %>%
+  filter(sharedDevice == "returning") %>%
+  distinct(document_id, .keep_all = TRUE)
+
+cat(
+  "Returning/replay sessions excluded:",
+  nrow(returning_exclusions),
+  "\n"
+)
+
+# One record per eligible randomized participant
+# Keep ordinary sessions and legitimate new players on shared devices;
+# exclude returning participants who replayed the experiment.
+participant_attrition <- users_df %>%
+  filter(
+    is.na(sharedDevice) |
+      sharedDevice == "new_player"
+  ) %>%
+  arrange(userId, desc(sessionComplete)) %>%
+  distinct(userId, .keep_all = TRUE)
+
+# Count distinct retained game-log rounds for each eligible participant
+participant_round_counts <- experiment_master %>%
+  group_by(userId) %>%
+  summarize(
+    logged_rounds = n_distinct(roundNumber),
+    .groups = "drop"
+  )
+
+# Retain eligible participants with zero game logs
+participant_attrition <- participant_attrition %>%
+  left_join(participant_round_counts, by = "userId") %>%
+  mutate(
+    logged_rounds = replace_na(logged_rounds, 0L),
+
+    round_status = case_when(
+      logged_rounds == 0 ~ "0 rounds",
+      logged_rounds >= 1 & logged_rounds <= 4 ~ "1–4 rounds",
+      logged_rounds == 5 ~ "5 rounds",
+      TRUE ~ "Other"
+    ),
+
+    round_status = factor(
+      round_status,
+      levels = c("0 rounds", "1–4 rounds", "5 rounds", "Other")
+    )
+  )
+
+# Attrition summary by treatment
+attrition_summary <- participant_attrition %>%
+  group_by(treatment) %>%
+  summarize(
+    N = n(),
+
+    `Zero Logs N` = sum(logged_rounds == 0),
+    `Zero Logs %` =
+      round(mean(logged_rounds == 0) * 100, 1),
+
+    `Partial (1–4) N` =
+      sum(logged_rounds >= 1 & logged_rounds <= 4),
+    `Partial (1–4) %` =
+      round(mean(logged_rounds >= 1 & logged_rounds <= 4) * 100, 1),
+
+    `Five Rounds N` = sum(logged_rounds == 5),
+    `Five Rounds %` =
+      round(mean(logged_rounds == 5) * 100, 1),
+
+    .groups = "drop"
+  )
+
+attrition_summary %>%
+  knitr::kable(
+    caption = paste(
+      "Observed Puzzle-Round Completion by Treatment",
+      "Among Eligible Participants"
+    )
+  )
+
+
+```
+
+```{r}
+#Add Attrition by Number of Rounds (Puzzles) Completed 
+treatment_totals <- participant_attrition %>%
+  count(treatment, name = "Treatment N")
+
+exact_round_summary <- participant_attrition %>%
+  filter(logged_rounds >= 1 & logged_rounds <= 4) %>%
+  count(treatment, logged_rounds, name = "N") %>%
+  tidyr::complete(
+    treatment,
+    logged_rounds = 1:4,
+    fill = list(N = 0)
+  ) %>%
+  left_join(treatment_totals, by = "treatment") %>%
+  mutate(
+    `Percent of Treatment Group` =
+      round(N / `Treatment N` * 100, 1)
+  )
+
+exact_round_summary %>%
+  select(treatment, logged_rounds, N, `Percent of Treatment Group`) %>%
+  knitr::kable(
+    col.names = c(
+      "Treatment",
+      "Logged Rounds",
+      "N",
+      "% of Treatment Group"
+    ),
+    caption = "Partial Completion by Exact Number of Logged Rounds"
+  )
+```
+
 
 ## Outcome Summary
 
@@ -292,6 +471,34 @@ df <- clean %>%
 cat("\nFinal dataset: ", n_distinct(df$userId), "users |", nrow(df), "rounds\n")
 cat("Rounds per treatment:\n")
 print(count(df, treatment))
+
+
+
+# Create recruitment-source subsamples
+df_prolific <- df %>%
+  filter(!is.na(prolificPid))
+
+df_organic <- df %>%
+  filter(is.na(prolificPid))
+
+cat("\nSample sizes:\n")
+cat("Full:", n_distinct(df$userId), "users |", nrow(df), "rounds\n")
+cat(
+  "Prolific:",
+  n_distinct(df_prolific$userId),
+  "users |",
+  nrow(df_prolific),
+  "rounds\n"
+)
+cat(
+  "Organic:",
+  n_distinct(df_organic$userId),
+  "users |",
+  nrow(df_organic),
+  "rounds\n"
+)
+
+
 ```
 
 ## Primary Model 1: log(timeEngaged)
@@ -476,3 +683,90 @@ print(data.frame(
   row.names = rt_sol$Coef[trt_s]
 ))
 ```
+
+
+## Secondary Model (Persistence under failure)
+```{r}
+
+#Look at only the skipped puzzles, what was the time before skipping under the treatment groups compared to control. 
+
+# Keep only puzzle rounds that ended in a skip
+df_skip_time <- df %>%
+  filter(didSkip == TRUE) %>%
+  drop_na(timeEngaged, treatment, puzzleId, puzzleSkill, userId) %>%
+  mutate(
+    treatment = relevel(factor(treatment), ref = "no_label"),
+    puzzleId  = relevel(factor(puzzleId), ref = "puzzle_01"),
+    logTE      = log(timeEngaged + 1)
+  )
+
+cat(
+  "Skipped rounds:", nrow(df_skip_time),
+  "\nParticipants:", n_distinct(df_skip_time$userId),
+  "\n"
+)
+
+# Raw descriptive results
+df_skip_time %>%
+  group_by(treatment) %>%
+  summarize(
+    Participants = n_distinct(userId),
+    `Skipped Rounds` = n(),
+    `Mean Time to Skip (s)` = round(mean(timeEngaged), 1),
+    `Median Time to Skip (s)` = round(median(timeEngaged), 1),
+    .groups = "drop"
+  ) %>%
+  knitr::kable(
+    caption = "Time Engaged Among Skipped Puzzle Rounds"
+  )
+
+# Model time to skip
+m_skip_time <- lmer(
+  logTE ~ treatment + puzzleId + puzzleSkill + (1 | userId),
+  data = df_skip_time,
+  REML = FALSE
+)
+
+# Participant-clustered standard errors
+vcov_skip_time <- vcovCR(
+  m_skip_time,
+  cluster = df_skip_time$userId,
+  type = "CR1"
+)
+
+test_skip_time <- coef_test(
+  m_skip_time,
+  vcov = vcov_skip_time,
+  test = "Satterthwaite"
+)
+
+# Display treatment effects only
+treatment_rows <- grepl("^treatment", test_skip_time$Coef)
+
+skip_time_results <- data.frame(
+  Comparison = test_skip_time$Coef[treatment_rows],
+  Estimate = test_skip_time$beta[treatment_rows],
+  SE = test_skip_time$SE[treatment_rows],
+  t = test_skip_time$tstat[treatment_rows],
+  p = test_skip_time$p_Satt[treatment_rows]
+) %>%
+  mutate(
+    `Approximate % Difference` =
+      100 * (exp(Estimate) - 1),
+    `BH-adjusted p` =
+      p.adjust(p, method = "BH")
+  ) %>%
+  mutate(
+    across(
+      c(Estimate, SE, t, p, `Approximate % Difference`,
+        `BH-adjusted p`),
+      ~ round(.x, 4)
+    )
+  )
+
+skip_time_results %>%
+  knitr::kable(
+    caption = "Label Effects on Time Engaged Among Skipped Puzzles"
+  )
+```
+
