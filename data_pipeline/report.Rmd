@@ -25,7 +25,6 @@ master      <- readRDS("analysis_data.rds")
 df          <- master %>% filter(sessionComplete == TRUE)
 df_prolific <- df %>% filter(source == "Prolific")
 df_organic  <- df %>% filter(source == "Organic")
-all_users   <- master %>% distinct(userId, .keep_all = TRUE)
 ```
 
 ## Study Design
@@ -105,13 +104,14 @@ data.frame(
 ## Attrition
 
 ```{r attrition, results = 'asis'}
-all_users <- all_users %>%
+attrition_df <- master %>%
+  distinct(userId, .keep_all = TRUE) %>%
   mutate(
     dropped   = as.integer(sessionComplete != TRUE),
     treatment = relevel(factor(treatment), ref = "no_label")
   )
 
-all_users %>%
+attrition_df %>%
   group_by(source, treatment) %>%
   summarize(
     n_started     = n(),
@@ -121,9 +121,9 @@ all_users %>%
   ) %>%
   kable(caption = "Attrition by Treatment Arm and Recruitment Source")
 
-m_att_full     <- glm(dropped ~ treatment, data = all_users, family = binomial)
-m_att_organic  <- glm(dropped ~ treatment, data = filter(all_users, source == "Organic"), family = binomial)
-m_att_prolific <- glm(dropped ~ treatment, data = filter(all_users, source == "Prolific"), family = binomial)
+m_att_full     <- glm(dropped ~ treatment, data = attrition_df, family = binomial)
+m_att_organic  <- glm(dropped ~ treatment, data = filter(attrition_df, source == "Organic"), family = binomial)
+m_att_prolific <- glm(dropped ~ treatment, data = filter(attrition_df, source == "Prolific"), family = binomial)
 
 stargazer(m_att_full, m_att_organic, m_att_prolific,
           type             = "html",

@@ -316,8 +316,8 @@ cat("R2a Any hard puzzle below p5:    ", sum(ai_flags$flag_R2a), "\n")
 cat("R2b 2+ hard puzzles below p10:   ", sum(ai_flags$flag_R2b), "\n")
 cat("TOTAL excluded (R1|R2a|R2b):     ", sum(all_flags$any_flag), "\n")
 
-# Master dataset: all users passing S2-S7 + AI exclusions, deduped
-# sessionComplete retained as column — filter to TRUE downstream for models
+# Master dataset: all users passing S2-S7 + AI exclusions
+# One row per user × puzzle (earliest round kept). sessionComplete retained for downstream filtering.
 master <- clean %>%
   left_join(all_flags %>% select(userId, any_flag), by = "userId") %>%
   filter(!any_flag) %>%
@@ -325,8 +325,8 @@ master <- clean %>%
     zero_att_skip = as.integer(didSkip & attemptCount == 0),
     logAtt        = log(attemptCount + 1)
   ) %>%
-  arrange(userId, puzzleId, roundNumber, desc(isSolved | didSkip), didSkip) %>%
-  distinct(userId, puzzleId, roundNumber, .keep_all = TRUE)
+  arrange(userId, puzzleId, roundNumber) %>%
+  distinct(userId, puzzleId, .keep_all = TRUE)
 
 cat("\nMaster dataset:", n_distinct(master$userId), "users |", nrow(master), "rounds\n")
 cat("Completers (sessionComplete=TRUE):", n_distinct(master$userId[master$sessionComplete == TRUE]), "\n")
@@ -340,7 +340,7 @@ cat("Saved analysis_data.rds\n")
 ## Attrition Analysis
 
 ```{r attrition, results = 'asis'}
-all_users <- master %>%
+attrition_df <- master %>%
   distinct(userId, .keep_all = TRUE) %>%
   mutate(
     dropped   = as.integer(sessionComplete != TRUE),
@@ -348,7 +348,7 @@ all_users <- master %>%
   )
 
 # Attrition rates table
-all_users %>%
+attrition_df %>%
   group_by(source, treatment) %>%
   summarize(
     n_started     = n(),
@@ -359,9 +359,9 @@ all_users %>%
   kable(caption = "Attrition by Treatment Arm and Recruitment Source")
 
 # Fit models
-m_att_full     <- glm(dropped ~ treatment, data = all_users, family = binomial)
-m_att_organic  <- glm(dropped ~ treatment, data = filter(all_users, source == "Organic"), family = binomial)
-m_att_prolific <- glm(dropped ~ treatment, data = filter(all_users, source == "Prolific"), family = binomial)
+m_att_full     <- glm(dropped ~ treatment, data = attrition_df, family = binomial)
+m_att_organic  <- glm(dropped ~ treatment, data = filter(attrition_df, source == "Organic"), family = binomial)
+m_att_prolific <- glm(dropped ~ treatment, data = filter(attrition_df, source == "Prolific"), family = binomial)
 
 stargazer(m_att_full, m_att_organic, m_att_prolific,
           type             = "text",
@@ -374,7 +374,7 @@ stargazer(m_att_full, m_att_organic, m_att_prolific,
           report           = "vcs*p")
 
 # Completer vs dropout baseline comparison
-all_users %>%
+attrition_df %>%
   group_by(completed = ifelse(dropped == 0, "Completed", "Dropped")) %>%
   summarize(
     n                  = n(),
@@ -387,6 +387,7 @@ all_users %>%
   kable(caption = "Baseline Characteristics: Completers vs Dropouts")
 ```
 
----
+------------------------------------------------------------------------
 
-*Modeling and results are in `modeling_scratch.Rmd` and `report.Rmd`. Load `analysis_data.rds` to access the final analysis dataset.*
+*Modeling and results are in `modeling_scratch.Rmd` and `report.Rmd`.
+Load `analysis_data.rds` to access the final analysis dataset.*

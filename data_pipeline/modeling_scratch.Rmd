@@ -20,11 +20,10 @@ library(clubSandwich)
 library(knitr)
 library(stargazer)
 
-master    <- readRDS("analysis_data.rds")
-df        <- master %>% filter(sessionComplete == TRUE)
+master      <- readRDS("analysis_data.rds")
+df          <- master %>% filter(sessionComplete == TRUE)
 df_prolific <- df %>% filter(source == "Prolific")
 df_organic  <- df %>% filter(source == "Organic")
-all_users   <- master %>% distinct(userId, .keep_all = TRUE)
 
 cat("Master:", n_distinct(master$userId), "users |", nrow(master), "rounds\n")
 cat("Completers:", n_distinct(df$userId), "| Prolific:", n_distinct(df_prolific$userId),
