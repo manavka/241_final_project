@@ -181,8 +181,8 @@ Session-level and round-level exclusions applied in order below.
 
 ```{r clean-data}
 # ── Exclusion criteria ─────────────────────────────────────────────────────────
+# sessionComplete is retained as a column — filter downstream (TRUE = completer).
 # Session-level (user excluded entirely):
-#   S1. sessionComplete == FALSE: only keep fully finished 5-round sessions
 #   S2. age < 18: adults only
 #   S3. sharedDevice == "returning": duplicate session from same device
 #   S4. prolificRejected == TRUE: flagged by Prolific platform
@@ -222,7 +222,6 @@ user_tab_paused <- experiment_master %>%
   summarize(total_tab_paused = sum(tabSwitchTimePaused, na.rm = TRUE), .groups = "drop")
 
 clean <- experiment_master %>%
-  filter(sessionComplete == TRUE) %>%
   filter(age >= 18) %>%
   filter(is.na(sharedDevice) | sharedDevice == "new_player") %>%
   filter(is.na(prolificRejected) | prolificRejected != TRUE) %>%
@@ -233,6 +232,7 @@ clean <- experiment_master %>%
   filter(total_tab_paused <= 600) %>%
   select(-total_tab_paused) %>%
   mutate(
+    source     = ifelse(!is.na(prolificPid), "Prolific", "Organic"),
     logTE      = log(timeEngaged + 1),
     treatment  = relevel(factor(treatment), ref = "no_label"),
     puzzleId   = relevel(factor(puzzleId),  ref = "puzzle_01"),
@@ -316,9 +316,9 @@ cat("R2a Any hard puzzle below p5:    ", sum(ai_flags$flag_R2a), "\n")
 cat("R2b 2+ hard puzzles below p10:   ", sum(ai_flags$flag_R2b), "\n")
 cat("TOTAL excluded (R1|R2a|R2b):     ", sum(all_flags$any_flag), "\n")
 
-# Final analysis dataset
-# Dedup within (userId, puzzleId, roundNumber): prefer completed row (isSolved | didSkip)
-df <- clean %>%
+# Master dataset: all users passing S2-S7 + AI exclusions, deduped
+# sessionComplete retained as column — filter to TRUE downstream for models
+master <- clean %>%
   left_join(all_flags %>% select(userId, any_flag), by = "userId") %>%
   filter(!any_flag) %>%
   mutate(
@@ -328,24 +328,22 @@ df <- clean %>%
   arrange(userId, puzzleId, roundNumber, desc(isSolved | didSkip), didSkip) %>%
   distinct(userId, puzzleId, roundNumber, .keep_all = TRUE)
 
-cat("\nFinal dataset: ", n_distinct(df$userId), "users |", nrow(df), "rounds\n")
+cat("\nMaster dataset:", n_distinct(master$userId), "users |", nrow(master), "rounds\n")
+cat("Completers (sessionComplete=TRUE):", n_distinct(master$userId[master$sessionComplete == TRUE]), "\n")
 cat("Rounds per treatment:\n")
-print(count(df, treatment))
+print(count(master %>% filter(sessionComplete == TRUE), treatment))
 
-# Save clean analysis dataset for downstream Rmds
-saveRDS(df,                "analysis_data.rds")
-saveRDS(experiment_master, "experiment_master.rds")
-cat("Saved analysis_data.rds and experiment_master.rds\n")
+saveRDS(master, "analysis_data.rds")
+cat("Saved analysis_data.rds\n")
 ```
 
 ## Attrition Analysis
 
 ```{r attrition, results = 'asis'}
-all_users <- experiment_master %>%
+all_users <- master %>%
   distinct(userId, .keep_all = TRUE) %>%
   mutate(
     dropped   = as.integer(sessionComplete != TRUE),
-    source    = ifelse(!is.na(prolificPid), "Prolific", "Organic"),
     treatment = relevel(factor(treatment), ref = "no_label")
   )
 

@@ -20,15 +20,15 @@ library(clubSandwich)
 library(knitr)
 library(stargazer)
 
-# Load clean analysis dataset produced by firestore_preprocessing.Rmd
-df              <- readRDS("analysis_data.rds")
-experiment_master <- readRDS("experiment_master.rds")
+master    <- readRDS("analysis_data.rds")
+df        <- master %>% filter(sessionComplete == TRUE)
+df_prolific <- df %>% filter(source == "Prolific")
+df_organic  <- df %>% filter(source == "Organic")
+all_users   <- master %>% distinct(userId, .keep_all = TRUE)
 
-df_prolific <- df %>% filter(!is.na(prolificPid))
-df_organic  <- df %>% filter(is.na(prolificPid))
-
-cat("Analysis dataset:", n_distinct(df$userId), "users |", nrow(df), "rounds\n")
-cat("Prolific:", n_distinct(df_prolific$userId), "| Organic:", n_distinct(df_organic$userId), "\n")
+cat("Master:", n_distinct(master$userId), "users |", nrow(master), "rounds\n")
+cat("Completers:", n_distinct(df$userId), "| Prolific:", n_distinct(df_prolific$userId),
+    "| Organic:", n_distinct(df_organic$userId), "\n")
 ```
 
 ## Primary Model 1: log(timeEngaged)

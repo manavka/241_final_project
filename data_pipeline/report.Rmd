@@ -21,11 +21,11 @@ library(clubSandwich)
 library(knitr)
 library(stargazer)
 
-df               <- readRDS("analysis_data.rds")
-experiment_master <- readRDS("experiment_master.rds")
-
-df_prolific <- df %>% filter(!is.na(prolificPid))
-df_organic  <- df %>% filter(is.na(prolificPid))
+master      <- readRDS("analysis_data.rds")
+df          <- master %>% filter(sessionComplete == TRUE)
+df_prolific <- df %>% filter(source == "Prolific")
+df_organic  <- df %>% filter(source == "Organic")
+all_users   <- master %>% distinct(userId, .keep_all = TRUE)
 ```
 
 ## Study Design
@@ -105,11 +105,9 @@ data.frame(
 ## Attrition
 
 ```{r attrition, results = 'asis'}
-all_users <- experiment_master %>%
-  distinct(userId, .keep_all = TRUE) %>%
+all_users <- all_users %>%
   mutate(
     dropped   = as.integer(sessionComplete != TRUE),
-    source    = ifelse(!is.na(prolificPid), "Prolific", "Organic"),
     treatment = relevel(factor(treatment), ref = "no_label")
   )
 
