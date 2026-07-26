@@ -340,28 +340,29 @@ cat("Saved analysis_data.rds\n")
 ## Attrition Analysis
 
 ```{r attrition, results = 'asis'}
-attrition_df <- master %>%
-  distinct(userId, .keep_all = TRUE) %>%
-  mutate(
-    dropped   = as.integer(sessionComplete != TRUE),
-    treatment = relevel(factor(treatment), ref = "no_label")
-  )
+user_level <- master %>% distinct(userId, .keep_all = TRUE)
 
-# Attrition rates table
-attrition_df %>%
+# Attrition rates by source and treatment
+user_level %>%
   group_by(source, treatment) %>%
   summarize(
     n_started     = n(),
-    n_dropped     = sum(dropped),
-    attrition_pct = paste0(round(mean(dropped) * 100, 1), "%"),
+    n_dropped     = sum(sessionComplete == FALSE),
+    attrition_pct = paste0(round(mean(sessionComplete == FALSE) * 100, 1), "%"),
     .groups = "drop"
   ) %>%
   kable(caption = "Attrition by Treatment Arm and Recruitment Source")
 
-# Fit models
-m_att_full     <- glm(dropped ~ treatment, data = attrition_df, family = binomial)
-m_att_organic  <- glm(dropped ~ treatment, data = filter(attrition_df, source == "Organic"), family = binomial)
-m_att_prolific <- glm(dropped ~ treatment, data = filter(attrition_df, source == "Prolific"), family = binomial)
+# Logistic model: does treatment predict dropout?
+user_level <- user_level %>%
+  mutate(
+    dropped   = as.integer(sessionComplete == FALSE),
+    treatment = relevel(factor(treatment), ref = "no_label")
+  )
+
+m_att_full     <- glm(dropped ~ treatment, data = user_level, family = binomial)
+m_att_organic  <- glm(dropped ~ treatment, data = filter(user_level, source == "Organic"),  family = binomial)
+m_att_prolific <- glm(dropped ~ treatment, data = filter(user_level, source == "Prolific"), family = binomial)
 
 stargazer(m_att_full, m_att_organic, m_att_prolific,
           type             = "text",
@@ -374,8 +375,8 @@ stargazer(m_att_full, m_att_organic, m_att_prolific,
           report           = "vcs*p")
 
 # Completer vs dropout baseline comparison
-attrition_df %>%
-  group_by(completed = ifelse(dropped == 0, "Completed", "Dropped")) %>%
+user_level %>%
+  group_by(Status = ifelse(sessionComplete == TRUE, "Completed", "Dropped")) %>%
   summarize(
     n                  = n(),
     Age                = round(mean(age, na.rm = TRUE), 1),

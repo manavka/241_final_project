@@ -2,24 +2,30 @@
 title: "The Effect of Difficulty Labels on Puzzle Engagement"
 author: ""
 date: "`r Sys.Date()`"
-output: html_document
+output: bookdown::pdf_document2
+header-includes:
+  - \usepackage{booktabs}
+  - \usepackage[table]{xcolor}
+  - \usepackage{threeparttable}
+  - \usepackage{multirow}
 editor_options:
   markdown:
     wrap: 72
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+knitr::opts_chunk$set(echo = FALSE, warning = TRUE, message = TRUE, error = TRUE)
 ```
 
-```{r load-data}
+```{r load-data, include=FALSE}
 library(dplyr)
 library(tidyr)
 library(purrr)
 library(lme4)
 library(clubSandwich)
 library(knitr)
-library(stargazer)
+library(kableExtra)
+library(modelsummary)
 
 master      <- readRDS("analysis_data.rds")
 df          <- master %>% filter(sessionComplete == TRUE)
@@ -27,187 +33,328 @@ df_prolific <- df %>% filter(source == "Prolific")
 df_organic  <- df %>% filter(source == "Organic")
 ```
 
-## Study Design
+## Treatment
 
-[Brief description of experiment — 3 arms (no_label, easy_label, hard_label), puzzle platform, Prolific + organic recruitment]
+The experimental treatment was a difficulty label presented to
+participants before each logic puzzle, designed to prime expectations
+about puzzle difficulty prior to engagement. The anticipated mechanism
+was that these primed expectations would influence persistence —
+measured as time spent on a puzzle before solving or skipping.
 
-## Sample
+Participants were randomly assigned at session entry to one of three
+conditions: (1) no label, (2) easy label, or (3) hard label. Within the
+application, all other aspects of the experience were held constant
+across arms — the interface, instructions, and the five logic puzzles —
+so differences in behavior across treatment groups can be attributed to
+the difficulty label.
 
-```{r sample-summary}
-df %>%
-  distinct(userId, .keep_all = TRUE) %>%
-  mutate(source = ifelse(!is.na(prolificPid), "Prolific", "Organic")) %>%
-  count(source, treatment) %>%
-  pivot_wider(names_from = treatment, values_from = n) %>%
-  kable(caption = "Final Sample by Recruitment Source and Treatment Arm")
+The study recruited from two populations with distinct incentive
+structures. Organic participants were recruited through personal
+networks with no standardized referral message and no financial
+incentive to complete the study. Prolific participants were recruited
+through the Prolific platform, which delivers a standardized study
+listing and compensates participants contingent on completion. Because
+participants arrived through different channels and under different
+incentive conditions, recruitment source may independently shape both
+attrition and engagement regardless of treatment. This is a known
+limitation of the design, and recruitment source is accounted for
+throughout the analysis rather than pooled away.
+
+Because participants completed five puzzle rounds, the analysis also
+accounts for differences among puzzles and for within-participant
+correlation across rounds.
+
+Treatment delivery was controlled entirely through the application, and
+the data contain no indication that any participant was shown a label
+other than their assigned condition; we therefore identified no
+treatment non-compliers. However, the application did not independently
+log the randomized assignment alongside the label rendered on screen for
+each round, so perfect delivery could not be independently verified.
+Future experiments should log these separately to enable a formal
+compliance check.
+
+## Potential Outcomes
+
+Each participant has three potential outcomes — the time engaged they
+would produce under each of the three label conditions:
+$Y_i(\text{no label})$, $Y_i(\text{easy label})$, and
+$Y_i(\text{hard label})$. By the fundamental problem of causal
+inference, only one of these is ever observed for any given participant.
+Random assignment to one of the three arms makes the unobserved
+potential outcomes independent of treatment assignment, allowing average
+potential outcomes to be estimated from group means.
+
+The primary comparisons of interest are the average treatment effects of
+each label condition relative to the `no label` control:
+
+$$\tau_{\text{easy}} = E[Y_i(\text{easy label})] - E[Y_i(\text{no label})]$$
+
+$$\tau_{\text{hard}} = E[Y_i(\text{hard label})] - E[Y_i(\text{no label})]$$
+
+The `no label` arm serves as the reference group, representing
+engagement in the absence of any difficulty prime. The two primary
+comparisons — `easy label` versus `no label` and `hard label` versus
+`no label` — isolate the effect of priming participants with a
+difficulty expectation, holding everything else constant. A positive
+effect would indicate that priming increases persistence (time engaged);
+a negative effect would indicate it discourages it. The direction is
+expected to differ by label valence, with an easy prime potentially
+encouraging engagement and a hard prime potentially suppressing it.
+
+## Randomization and Attrition
+
+### Randomization
+
+Treatment was assigned entirely client-side at the moment a participant
+clicked "I understand – let's go" on the consent screen. The game engine
+drew a single uniform random variate and mapped it to one of three arms
+with nearly equal probability:
+
+```         
+r = Math.random()
+Treatment = r < 0.333 ? 'no_label'
+          : r < 0.666 ? 'hard_label'
+          : 'easy_label'
 ```
 
-## Covariate Balance
+`Math.random()` draws a number between 0 and 1 uniformly, with the unit
+interval cut into three equal slices. Each arm was assigned with
+approximately one-third probability. The treatment draw was written to a
+`localStorage` draft immediately after assignment, which occurs after
+the consent screen. Participants who closed and returned mid-session
+were shown a "Welcome back" screen that restored their original
+treatment from the draft, ensuring the draw was not re-rolled on page
+reload. A participant's IP address was additionally captured and stored
+under a separate `localStorage` key to detect whether a device had
+previously completed a full session. Returning devices were routed to a
+shared-device screening question where participants self-reported
+whether they were a new or returning player. Together, the IP-based flag
+and the self-report allowed us to distinguish true first-time sessions
+from replays and from new participants sharing a household device,
+retaining only genuine first sessions.
 
-```{r balance}
-user_level <- experiment_master %>%
-  distinct(userId, .keep_all = TRUE) %>%
-  mutate(source = ifelse(!is.na(prolificPid), "Prolific", "Organic"))
+### Recruitment Populations
 
-# Continuous
-continuous_vars <- c("age", "quantitativeExposure")
-cont_means <- user_level %>%
-  group_by(treatment) %>%
-  summarize(across(all_of(continuous_vars), ~ round(mean(.x, na.rm = TRUE), 2))) %>%
-  pivot_longer(-treatment, names_to = "Covariate", values_to = "val") %>%
-  pivot_wider(names_from = treatment, values_from = val)
+This study drew from two distinct recruitment populations. Because the
+recruitment source shapes both the attrition mechanism and potentially
+the outcome measures themselves, we identify each participant's source
+(organic or Prolific) and account for it throughout the analysis. The
+organic sample was recruited through personal networks – friends,
+family, and word of mouth – with no standardized referral message, no
+controlled timing, and no single delivery channel. Organic participants
+had no financial incentive to complete the study. The Prolific sample
+was recruited through the Prolific platform, which delivers a
+standardized study listing and compensates participants contingent on
+completion and quality of the effort. Prolific participants are likely
+to be experienced survey-takers operating under platform norms around
+task completion.
 
-cont_p <- map_dfr(continuous_vars, function(v) {
-  p <- summary(aov(as.formula(paste(v, "~ treatment")), data = user_level))[[1]]["treatment", "Pr(>F)"]
-  data.frame(Covariate = v, p_value = round(p, 4))
-})
-left_join(cont_means, cont_p, by = "Covariate") %>%
-  kable(caption = "Continuous Covariate Balance (mean, ANOVA p)")
+### Attrition
 
-# Ordinal
-ordinal_vars <- c("puzzleSkill", "puzzleEnjoyment", "energyLevel")
-ord_medians <- user_level %>%
-  group_by(treatment) %>%
-  summarize(across(all_of(ordinal_vars), ~ median(.x, na.rm = TRUE))) %>%
-  pivot_longer(-treatment, names_to = "Covariate", values_to = "val") %>%
-  pivot_wider(names_from = treatment, values_from = val)
+Attrition is defined as beginning treatment, but failing to complete all
+five rounds. Specifically, a participant is counted as an attritor if
+they have a user record in the database – created at the moment they
+click "Start the Challenge" and are shown a Round 1 label card, but
+their session was never marked complete. Variable `sessionComplete` is
+set to TRUE only when a participant reaches the results screen after
+resolving all five rounds (each ending in either a correct answer or a
+skip). Participants who passed through the survey and opted out before
+clicking "Start the Challenge" are not counted as attritors, because no
+user record is created for them and they were never exposed to the
+treatment.
 
-ord_p <- map_dfr(ordinal_vars, function(v) {
-  p <- fisher.test(table(user_level$treatment, user_level[[v]]),
-                   simulate.p.value = TRUE)$p.value
-  data.frame(Covariate = v, p_value = round(p, 4))
-})
-left_join(ord_medians, ord_p, by = "Covariate") %>%
-  kable(caption = "Ordinal Covariate Balance (median, Fisher's exact p)")
+#### Differential Attrition in Organic and Prolific subsamples
 
-# Categorical
-user_level %>%
-  group_by(treatment) %>%
-  summarize(
-    `% Prolific` = paste0(round(mean(source == "Prolific") * 100, 1), "%"),
-    `% Desktop`  = paste0(round(mean(deviceType == "Desktop", na.rm = TRUE) * 100, 1), "%"),
-    `% Female`   = paste0(round(mean(gender == "Female", na.rm = TRUE) * 100, 1), "%")
-  ) %>%
-  kable(caption = "Categorical Covariate Balance")
+The attrition analysis fits logistic regression models predicting
+dropout on treatment arm, estimated separately for the full sample and
+the organic subsample, with no_label as the reference arm. The Prolific
+subsample had zero dropout across all arms and is reported descriptively
+only.
 
-data.frame(
-  Variable = c("source", "deviceType", "gender"),
-  p_value  = c(
-    round(fisher.test(table(user_level$treatment, user_level$source), simulate.p.value = TRUE)$p.value, 4),
-    round(fisher.test(table(user_level$treatment, user_level$deviceType), simulate.p.value = TRUE)$p.value, 4),
-    round(fisher.test(table(user_level$treatment, user_level$gender), simulate.p.value = TRUE)$p.value, 4)
-  )
-) %>%
-  kable(caption = "Categorical Balance p-values (Fisher's exact)")
-```
-
-## Attrition
-
-```{r attrition, results = 'asis'}
-attrition_df <- master %>%
+```{r tab-attrition}
+user_level <- master %>%
   distinct(userId, .keep_all = TRUE) %>%
   mutate(
-    dropped   = as.integer(sessionComplete != TRUE),
+    dropped   = as.integer(sessionComplete == FALSE),
     treatment = relevel(factor(treatment), ref = "no_label")
   )
 
-attrition_df %>%
+m_att_full    <- glm(dropped ~ treatment, data = user_level, family = binomial)
+m_att_organic <- glm(dropped ~ treatment,
+                     data = filter(user_level, source == "Organic"),
+                     family = binomial)
+
+get_or_p <- function(model, term) {
+  if (is.null(model)) return(c(NA, NA))
+  s <- coef(summary(model))
+  if (!term %in% rownames(s)) return(c(NA, NA))
+  c(exp(s[term, "Estimate"]), s[term, "Pr(>|z|)"])
+}
+
+fmt_p <- function(p) {
+  if (is.na(p)) return("—")
+  ifelse(p < .001, "<.001", as.character(round(p, 3)))
+}
+
+or_lookup <- bind_rows(
+  tibble(source = "Organic", treatment = "easy_label",
+         OR = get_or_p(m_att_organic, "treatmenteasy_label")[1],
+         p  = get_or_p(m_att_organic, "treatmenteasy_label")[2]),
+  tibble(source = "Organic", treatment = "hard_label",
+         OR = get_or_p(m_att_organic, "treatmenthard_label")[1],
+         p  = get_or_p(m_att_organic, "treatmenthard_label")[2]),
+  tibble(source = "Prolific", treatment = "easy_label", OR = NA, p = NA),
+  tibble(source = "Prolific", treatment = "hard_label", OR = NA, p = NA),
+  tibble(source = "Full", treatment = "easy_label",
+         OR = get_or_p(m_att_full, "treatmenteasy_label")[1],
+         p  = get_or_p(m_att_full, "treatmenteasy_label")[2]),
+  tibble(source = "Full", treatment = "hard_label",
+         OR = get_or_p(m_att_full, "treatmenthard_label")[1],
+         p  = get_or_p(m_att_full, "treatmenthard_label")[2])
+)
+
+attrition_tbl <- user_level %>%
   group_by(source, treatment) %>%
   summarize(
     n_started     = n(),
     n_dropped     = sum(dropped),
     attrition_pct = paste0(round(mean(dropped) * 100, 1), "%"),
     .groups = "drop"
+  )
+
+get_pct <- function(src, trt) {
+  attrition_tbl %>% filter(source == src, treatment == trt) %>% pull(attrition_pct)
+}
+
+org_no_pct   <- get_pct("Organic", "no_label")
+org_easy_pct <- get_pct("Organic", "easy_label")
+org_hard_pct <- get_pct("Organic", "hard_label")
+org_easy_or  <- round(get_or_p(m_att_organic, "treatmenteasy_label")[1], 3)
+org_easy_p   <- round(get_or_p(m_att_organic, "treatmenteasy_label")[2], 3)
+org_hard_or  <- round(get_or_p(m_att_organic, "treatmenthard_label")[1], 3)
+org_hard_p   <- round(get_or_p(m_att_organic, "treatmenthard_label")[2], 3)
+
+attrition_tbl %>%
+  mutate(treatment = factor(treatment,
+                            levels = c("no_label", "easy_label", "hard_label"),
+                            labels = c("No Label", "Easy Label", "Hard Label"))) %>%
+  left_join(or_lookup %>%
+              mutate(treatment = factor(treatment,
+                                       levels = c("no_label", "easy_label", "hard_label"),
+                                       labels = c("No Label", "Easy Label", "Hard Label"))),
+            by = c("source", "treatment")) %>%
+  mutate(
+    OR = case_when(
+      treatment == "No Label" ~ "ref.",
+      is.na(OR)              ~ "—",
+      TRUE                   ~ as.character(round(OR, 3))
+    ),
+    p = case_when(
+      treatment == "No Label" ~ "—",
+      is.na(p)               ~ "—",
+      TRUE                   ~ sapply(p, fmt_p)
+    )
   ) %>%
-  kable(caption = "Attrition by Treatment Arm and Recruitment Source")
-
-m_att_full     <- glm(dropped ~ treatment, data = attrition_df, family = binomial)
-m_att_organic  <- glm(dropped ~ treatment, data = filter(attrition_df, source == "Organic"), family = binomial)
-m_att_prolific <- glm(dropped ~ treatment, data = filter(attrition_df, source == "Prolific"), family = binomial)
-
-stargazer(m_att_full, m_att_organic, m_att_prolific,
-          type             = "html",
-          column.labels    = c("Full", "Organic", "Prolific"),
-          covariate.labels = c("Easy Label", "Hard Label"),
-          dep.var.labels   = "Dropped Out",
-          title            = "Table 1: Differential Attrition",
-          digits           = 3,
-          star.cutoffs     = c(0.05, 0.01, 0.001),
-          report           = "vcs*p")
+  arrange(source, treatment) %>%
+  select(-source) %>%
+  rename(
+    Treatment      = treatment,
+    `N Started`    = n_started,
+    `N Dropped`    = n_dropped,
+    `Dropout Rate` = attrition_pct,
+    `Odds Ratio`   = OR,
+    `p-value`      = p
+  ) %>%
+  kable(caption = "Attrition by Treatment Arm and Recruitment Source",
+        booktabs = TRUE,
+        align    = c("l", "c", "c", "c", "c", "c")) %>%
+  kable_styling(latex_options = c("striped", "hold_position"),
+                full_width = FALSE) %>%
+  pack_rows("Organic",  1, 3) %>%
+  pack_rows("Prolific", 4, 6) %>%
+  footnote(general = "Odds ratios from logistic regression predicting dropout; reference arm: No Label. Prolific model omitted due to zero attrition. Full sample OR uses pooled model.",
+           threeparttable = TRUE)
 ```
 
-## Primary Results: log(Time Engaged)
+Among organic participants, dropout rates were `r org_no_pct` in the no
+label arm, `r org_easy_pct` in the easy label arm, and `r org_hard_pct`
+in the hard label arm. The easy label coefficient is negligible and
+non-significant (OR = `r org_easy_or`, p = `r org_easy_p`), providing no
+evidence of a difference from the control. The hard label arm shows a
+suggestive but non-significant reduction in dropout odds relative to no
+label (OR = `r org_hard_or`, p = `r org_hard_p`), contrary to the prior
+expectation that a hard label would discourage persistence. The
+difference in dropout rates across arms is not statistically
+significant, so we cannot conclude that differential attrition
+meaningfully biases the primary outcome estimates. If the pattern were
+real, the direction of bias would work against finding a treatment
+effect. The no label arm losing more participants than the hard label
+arm would leave the no label completers as a comparatively more select
+group, which would compress the estimated difference between arms. The
+Prolific subsample had zero dropout across all three arms and is
+reported descriptively only, consistent with payment-based compliance
+overriding any label effect on attrition (see Table
+\@ref(tab:tab-attrition)).
 
-```{r primary-model}
-run_primary <- function(data) {
-  m_lean    <- lmer(logTE ~ treatment + puzzleId + puzzleSkill + (1 | userId),
-                    data = data, REML = FALSE)
-  vcov_lean <- vcovCR(m_lean, cluster = data$userId, type = "CR1")
-  rt_lean   <- coef_test(m_lean, vcov = vcov_lean, test = "Satterthwaite")
+## Intent-to-Treat & Covariate Balance
 
-  m_full    <- lmer(logTE ~ treatment + puzzleId +
-                      puzzleSkill + age + quantitativeExposure + energyLevel +
-                      deviceType + tabSwitchTimePaused + (1 | userId),
-                    data = data, REML = FALSE)
-  vcov_full <- vcovCR(m_full, cluster = data$userId, type = "CR1")
-  rt_full   <- coef_test(m_full, vcov = vcov_full, test = "Satterthwaite")
+Given the attrition observed above, the primary analysis proceeds on an
+intent-to-treat basis restricted to participants who completed all five
+rounds (`sessionComplete == TRUE`). This approach preserves the
+integrity of the original randomization, where treatment effects are
+estimated among those who received and complied with their assigned
+condition and avoids the additional assumptions required to impute
+outcomes for participants who dropped out.
 
-  trt_lean <- grepl("^treatment", rt_lean$Coef)
-  trt_full <- grepl("^treatment", rt_full$Coef)
-
-  bind_rows(
-    data.frame(model = "Lean", term = rt_lean$Coef[trt_lean],
-               est = round(rt_lean$beta[trt_lean], 3),
-               se  = round(rt_lean$SE[trt_lean], 3),
-               t   = round(rt_lean$tstat[trt_lean], 3),
-               p   = round(rt_lean$p_Satt[trt_lean], 4)),
-    data.frame(model = "Full", term = rt_full$Coef[trt_full],
-               est = round(rt_full$beta[trt_full], 3),
-               se  = round(rt_full$SE[trt_full], 3),
-               t   = round(rt_full$tstat[trt_full], 3),
-               p   = round(rt_full$p_Satt[trt_full], 4))
+```{r tab-balance}
+bal <- df %>%
+  distinct(userId, .keep_all = TRUE) %>%
+  mutate(
+    treatment   = relevel(factor(treatment), ref = "no_label"),
+    is_prolific = as.integer(source == "Prolific"),
+    is_desktop  = as.integer(deviceType == "Desktop"),
+    is_female   = as.integer(gender == "Female")
   )
-}
 
-bind_rows(
-  run_primary(df)          %>% mutate(sample = "Full"),
-  run_primary(df_prolific) %>% mutate(sample = "Prolific"),
-  run_primary(df_organic)  %>% mutate(sample = "Organic")
+models <- list(
+  "Age"            = lm(age                  ~ treatment, data = bal),
+  "Quant Exp"      = lm(quantitativeExposure ~ treatment, data = bal),
+  "Puzzle Skill"   = lm(puzzleSkill          ~ treatment, data = bal),
+  "Puzzle Enjoy"   = lm(puzzleEnjoyment      ~ treatment, data = bal),
+  "Energy"         = lm(energyLevel          ~ treatment, data = bal),
+  "Recruit Source" = lm(is_prolific          ~ treatment, data = bal),
+  "Desktop"        = lm(is_desktop           ~ treatment, data = bal),
+  "Female"         = lm(is_female            ~ treatment, data = bal)
+)
+
+modelsummary(
+  models,
+  coef_map  = c("treatmenteasy_label" = "Easy Label",
+                "treatmenthard_label" = "Hard Label"),
+  stars     = c("*" = 0.05, "**" = 0.01, "***" = 0.001),
+  gof_omit  = ".*",
+  title     = "Covariate Balance Across Treatment Arms",
+  notes     = "OLS coefficients vs. no-label reference arm. SEs in parentheses.",
+  booktabs  = TRUE,
+  output    = "kableExtra"
 ) %>%
-  select(sample, model, term, est, se, t, p) %>%
-  arrange(term, model, sample) %>%
-  mutate(p_adj = round(p.adjust(p, method = "BH"), 4)) %>%
-  kable(caption = "Table 2: Primary Model — log(Time Engaged) by Sample (cluster-robust SEs, BH-adjusted)")
+  kable_styling(latex_options = c("hold_position", "scale_down"), font_size = 9)
 ```
 
-## Secondary: Zero-Attempt Skip Rate
-
-```{r zero-att-skip}
-run_zas <- function(data) {
-  m <- glmer(
-    zero_att_skip ~ treatment + puzzleId + scale(puzzleSkill) + (1 | userId),
-    data = data, family = binomial,
-    control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 2e5))
-  )
-  cs   <- coef(summary(m))
-  rows <- grep("^treatment", rownames(cs))
-  data.frame(
-    term = rownames(cs)[rows],
-    OR   = round(exp(cs[rows, "Estimate"]), 3),
-    z    = round(cs[rows, "z value"], 3),
-    p    = round(cs[rows, "Pr(>|z|)"], 4)
-  )
-}
-
-bind_rows(
-  run_zas(df)          %>% mutate(sample = "Full"),
-  run_zas(df_prolific) %>% mutate(sample = "Prolific"),
-  run_zas(df_organic)  %>% mutate(sample = "Organic")
-) %>%
-  select(sample, term, OR, z, p) %>%
-  arrange(term, sample) %>%
-  kable(caption = "Table 3: Zero-Attempt Skip Model — OR by Sample (exploratory; raw p-values)")
-```
+Table @ref(tab:tab-balance) presents covariate balance across the three
+treatment arms among completers. Each column reports an OLS regression
+of one baseline characteristic on treatment indicators, with `no label`
+as the reference arm. None of the `easy label` or `hard label`
+coefficients reach conventional significance thresholds on any covariate
+— age, quantitative exposure, puzzle skill, puzzle enjoyment, energy
+level, recruitment source, device type, or gender. This indicates that
+the randomization produced comparable groups on all measured
+pre-treatment characteristics. The R² values are near zero throughout,
+confirming that treatment assignment explains essentially none of the
+variance in any baseline variable. This balance supports a clean
+intent-to-treat interpretation: observed differences in outcomes across
+arms are unlikely to reflect pre-existing differences in participant
+composition.
 
 ## Discussion
 
