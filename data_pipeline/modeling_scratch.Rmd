@@ -1,0 +1,212 @@
+---
+title: "Puzzle Engagement — Modeling Scratch"
+date: "`r Sys.Date()`"
+output: html_document
+editor_options:
+  markdown:
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load-data}
+library(dplyr)
+library(tidyr)
+library(purrr)
+library(lme4)
+library(clubSandwich)
+library(knitr)
+library(stargazer)
+
+# Load clean analysis dataset produced by firestore_preprocessing.Rmd
+df              <- readRDS("analysis_data.rds")
+experiment_master <- readRDS("experiment_master.rds")
+
+df_prolific <- df %>% filter(!is.na(prolificPid))
+df_organic  <- df %>% filter(is.na(prolificPid))
+
+cat("Analysis dataset:", n_distinct(df$userId), "users |", nrow(df), "rounds\n")
+cat("Prolific:", n_distinct(df_prolific$userId), "| Organic:", n_distinct(df_organic$userId), "\n")
+```
+
+## Primary Model 1: log(timeEngaged)
+
+Mixed effects model with random intercept per user (rounds nested within
+users). Reference: treatment = no_label, puzzleId = puzzle_01.
+Cluster-robust SEs (CR1, Satterthwaite df) account for within-user
+correlation. Lean spec (treatment + puzzleId + puzzleSkill) is primary;
+full covariate model is robustness check.
+
+```{r primary-model}
+run_primary <- function(data) {
+  # Lean model
+  m_lean    <- lmer(logTE ~ treatment + puzzleId + puzzleSkill + (1 | userId),
+                    data = data, REML = FALSE)
+  vcov_lean <- vcovCR(m_lean, cluster = data$userId, type = "CR1")
+  rt_lean   <- coef_test(m_lean, vcov = vcov_lean, test = "Satterthwaite")
+
+  # Full model
+  m_full    <- lmer(logTE ~ treatment + puzzleId +
+                      puzzleSkill + age + quantitativeExposure + energyLevel +
+                      deviceType + tabSwitchTimePaused + (1 | userId),
+                    data = data, REML = FALSE)
+  vcov_full <- vcovCR(m_full, cluster = data$userId, type = "CR1")
+  rt_full   <- coef_test(m_full, vcov = vcov_full, test = "Satterthwaite")
+
+  trt_lean <- grepl("^treatment", rt_lean$Coef)
+  trt_full <- grepl("^treatment", rt_full$Coef)
+
+  bind_rows(
+    data.frame(model = "Lean", term = rt_lean$Coef[trt_lean],
+               est = round(rt_lean$beta[trt_lean], 3),
+               se  = round(rt_lean$SE[trt_lean], 3),
+               t   = round(rt_lean$tstat[trt_lean], 3),
+               p   = round(rt_lean$p_Satt[trt_lean], 4)),
+    data.frame(model = "Full", term = rt_full$Coef[trt_full],
+               est = round(rt_full$beta[trt_full], 3),
+               se  = round(rt_full$SE[trt_full], 3),
+               t   = round(rt_full$tstat[trt_full], 3),
+               p   = round(rt_full$p_Satt[trt_full], 4))
+  )
+}
+
+bind_rows(
+  run_primary(df)          %>% mutate(sample = "Full"),
+  run_primary(df_prolific) %>% mutate(sample = "Prolific"),
+  run_primary(df_organic)  %>% mutate(sample = "Organic")
+) %>%
+  select(sample, model, term, est, se, t, p) %>%
+  arrange(term, model, sample) %>%
+  mutate(p_adj = round(p.adjust(p, method = "BH"), 4)) %>%
+  kable(caption = "Primary Model (logTE): Lean and Full by Sample (cluster-robust SEs, BH-adjusted)")
+```
+
+## Primary Model 2: Zero-Attempt Skip Rate
+
+Zero-attempt skips (didSkip + attemptCount == 0) measure cold
+disengagement — giving up without trying. Exploratory; raw p-values reported.
+
+```{r zero-att-skip-model}
+run_zas <- function(data) {
+  m <- glmer(
+    zero_att_skip ~ treatment + puzzleId + scale(puzzleSkill) + (1 | userId),
+    data = data, family = binomial,
+    control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 2e5))
+  )
+  cs   <- coef(summary(m))
+  rows <- grep("^treatment", rownames(cs))
+  data.frame(
+    term = rownames(cs)[rows],
+    OR   = round(exp(cs[rows, "Estimate"]), 3),
+    z    = round(cs[rows, "z value"], 3),
+    p    = round(cs[rows, "Pr(>|z|)"], 4)
+  )
+}
+
+bind_rows(
+  run_zas(df)          %>% mutate(sample = "Full"),
+  run_zas(df_prolific) %>% mutate(sample = "Prolific"),
+  run_zas(df_organic)  %>% mutate(sample = "Organic")
+) %>%
+  select(sample, term, OR, z, p) %>%
+  arrange(term, sample) %>%
+  kable(caption = "Zero-Attempt Skip Model: OR by Sample (exploratory; raw p-values)")
+```
+
+## Consistency Check: Attempt Count Among Skippers
+
+Among rounds that ended in a skip, did the label change how hard people
+tried before giving up? Outcome: log(attemptCount + 1). Models use cluster-robust SEs.
+
+```{r att-skippers}
+df_skip <- df %>% filter(didSkip == TRUE)
+cat("Skipped rounds:", nrow(df_skip), "from", n_distinct(df_skip$userId), "users\n")
+
+m_att_all  <- lmer(logAtt ~ treatment + puzzleId + puzzleSkill + (1 | userId),
+                   data = df_skip, REML = FALSE)
+rv_att_all <- vcovCR(m_att_all, cluster = df_skip$userId, type = "CR1")
+rt_att_all <- coef_test(m_att_all, vcov = rv_att_all, test = "Satterthwaite")
+trt_a      <- grepl("treatment", rt_att_all$Coef)
+
+data.frame(
+  Estimate  = round(rt_att_all$beta[trt_a], 4),
+  SE        = round(rt_att_all$SE[trt_a], 4),
+  t         = round(rt_att_all$tstat[trt_a], 3),
+  p_Satt    = round(rt_att_all$p_Satt[trt_a], 4),
+  row.names = rt_att_all$Coef[trt_a]
+) %>% kable(caption = "log(attempts+1) among skippers — all puzzles (exploratory)")
+
+# Hard number sequences only (puzzle_01 + puzzle_05)
+df_hard_skip <- df %>% filter(puzzleId %in% c("puzzle_01", "puzzle_05"), didSkip == TRUE)
+cat("\nHard puzzle (p01+p05) skipped rounds:", nrow(df_hard_skip),
+    "from", n_distinct(df_hard_skip$userId), "users\n")
+
+m_att_hard  <- lmer(logAtt ~ treatment + puzzleId + puzzleSkill + (1 | userId),
+                    data = df_hard_skip, REML = FALSE)
+rv_att_hard <- vcovCR(m_att_hard, cluster = df_hard_skip$userId, type = "CR1")
+rt_att_hard <- coef_test(m_att_hard, vcov = rv_att_hard, test = "Satterthwaite")
+trt_h       <- grepl("treatment", rt_att_hard$Coef)
+
+data.frame(
+  Estimate  = round(rt_att_hard$beta[trt_h], 4),
+  SE        = round(rt_att_hard$SE[trt_h], 4),
+  t         = round(rt_att_hard$tstat[trt_h], 3),
+  p_Satt    = round(rt_att_hard$p_Satt[trt_h], 4),
+  row.names = rt_att_hard$Coef[trt_h]
+) %>% kable(caption = "log(attempts+1) among skippers — puzzle_01 + puzzle_05 only (exploratory)")
+
+df_hard_skip %>%
+  group_by(treatment, puzzleId) %>%
+  summarize(n = n(), mean_att = round(mean(attemptCount), 2),
+            pct_zero_att = round(mean(attemptCount == 0) * 100, 1), .groups = "drop") %>%
+  arrange(puzzleId, treatment) %>%
+  kable(caption = "Raw means — avg attempts before skip on hard puzzles")
+```
+
+## Robustness: Overall Skip Rate & Solve Rate
+
+```{r robustness-models}
+# Overall skip rate
+m_skip <- suppressWarnings(glmer(
+  didSkip ~ treatment + puzzleId + puzzleSkill + (1 | userId),
+  data = df, family = binomial, control = glmerControl(optimizer = "bobyqa")
+))
+cs_skip <- coef(summary(m_skip))
+data.frame(
+  term = c("easy_label", "hard_label"),
+  OR   = round(exp(cs_skip[c("treatmenteasy_label", "treatmenthard_label"), "Estimate"]), 3),
+  p    = round(2 * pnorm(abs(cs_skip[c("treatmenteasy_label", "treatmenthard_label"), "z value"]),
+                         lower.tail = FALSE), 4)
+) %>% kable(caption = "Overall Skip Rate (didSkip) — robustness")
+
+# Solve rate
+m_solve <- suppressWarnings(glmer(
+  isSolved ~ treatment + puzzleId + puzzleSkill + (1 | userId),
+  data = df, family = binomial, control = glmerControl(optimizer = "bobyqa")
+))
+cs_solve <- coef(summary(m_solve))
+data.frame(
+  term = c("easy_label", "hard_label"),
+  OR   = round(exp(cs_solve[c("treatmenteasy_label", "treatmenthard_label"), "Estimate"]), 3),
+  p    = round(2 * pnorm(abs(cs_solve[c("treatmenteasy_label", "treatmenthard_label"), "z value"]),
+                         lower.tail = FALSE), 4)
+) %>% kable(caption = "Solve Rate (isSolved) — robustness")
+
+# logTE among solvers only
+clean_solved <- df %>% filter(isSolved == TRUE)
+m_solved  <- lmer(logTE ~ treatment + puzzleId + puzzleSkill + (1 | userId),
+                  data = clean_solved, REML = FALSE)
+rv_sol    <- vcovCR(m_solved, cluster = clean_solved$userId, type = "CR1")
+rt_sol    <- coef_test(m_solved, vcov = rv_sol, test = "Satterthwaite")
+trt_s     <- grepl("treatment", rt_sol$Coef)
+
+data.frame(
+  Estimate  = round(rt_sol$beta[trt_s], 4),
+  SE        = round(rt_sol$SE[trt_s], 4),
+  t         = round(rt_sol$tstat[trt_s], 3),
+  p_Satt    = round(rt_sol$p_Satt[trt_s], 4),
+  row.names = rt_sol$Coef[trt_s]
+) %>% kable(caption = "logTE among solved rounds only — robustness")
+```

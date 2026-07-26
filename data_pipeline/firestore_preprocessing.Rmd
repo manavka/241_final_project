@@ -94,30 +94,69 @@ Check randomization frequencies across treatment arms.
 
 ```{r balance-check}
 user_level <- experiment_master %>%
-  distinct(userId, .keep_all = TRUE)
+  distinct(userId, .keep_all = TRUE) %>%
+  mutate(source = ifelse(!is.na(prolificPid), "Prolific", "Organic"))
 
+# Treatment counts
 user_level %>%
   count(treatment) %>%
   kable(col.names = c("Treatment", "N"), caption = "Treatment Assignment")
 
+# Continuous covariates: mean by arm + ANOVA p
+continuous_vars <- c("age", "quantitativeExposure")
+cont_means <- user_level %>%
+  group_by(treatment) %>%
+  summarize(across(all_of(continuous_vars), ~ round(mean(.x, na.rm = TRUE), 2))) %>%
+  pivot_longer(-treatment, names_to = "Covariate", values_to = "val") %>%
+  pivot_wider(names_from = treatment, values_from = val)
+
+cont_p <- map_dfr(continuous_vars, function(v) {
+  p <- summary(aov(as.formula(paste(v, "~ treatment")), data = user_level))[[1]]["treatment", "Pr(>F)"]
+  data.frame(Covariate = v, p_value = round(p, 4))
+})
+
+left_join(cont_means, cont_p, by = "Covariate") %>%
+  kable(caption = "Continuous Covariate Balance (mean, ANOVA p)")
+
+# Ordinal covariates: median by arm + Fisher's p
+ordinal_vars <- c("puzzleSkill", "puzzleEnjoyment", "energyLevel")
+ord_medians <- user_level %>%
+  group_by(treatment) %>%
+  summarize(across(all_of(ordinal_vars), ~ median(.x, na.rm = TRUE))) %>%
+  pivot_longer(-treatment, names_to = "Covariate", values_to = "val") %>%
+  pivot_wider(names_from = treatment, values_from = val)
+
+ord_p <- map_dfr(ordinal_vars, function(v) {
+  p <- fisher.test(table(user_level$treatment, user_level[[v]]),
+                   simulate.p.value = TRUE)$p.value
+  data.frame(Covariate = v, p_value = round(p, 4))
+})
+
+left_join(ord_medians, ord_p, by = "Covariate") %>%
+  kable(caption = "Ordinal Covariate Balance (median, Fisher's exact p)")
+
+# Categorical covariates: % per arm + chi-square / Fisher's p
 user_level %>%
   group_by(treatment) %>%
   summarize(
-    N                  = n(),
-    Age                = round(mean(age, na.rm = TRUE), 1),
-    `Quant Exposure`   = round(mean(quantitativeExposure, na.rm = TRUE), 2),
-    `Puzzle Skill`     = round(mean(puzzleSkill, na.rm = TRUE), 2),
-    `Puzzle Enjoyment` = round(mean(puzzleEnjoyment, na.rm = TRUE), 2),
-    `Energy Level`     = round(mean(energyLevel, na.rm = TRUE), 2),
-    `% Desktop`        = round(mean(deviceType == "Desktop", na.rm = TRUE) * 100, 1)
+    `% Prolific` = paste0(round(mean(source == "Prolific") * 100, 1), "%"),
+    `% Desktop`  = paste0(round(mean(deviceType == "Desktop", na.rm = TRUE) * 100, 1), "%"),
+    `% Female`   = paste0(round(mean(gender == "Female", na.rm = TRUE) * 100, 1), "%")
   ) %>%
-  kable(caption = "Covariate Balance by Treatment")
+  kable(caption = "Categorical Covariate Balance (% by arm)")
 
-user_level %>%
-  count(treatment, gender) %>%
-  group_by(treatment) %>%
-  mutate(pct = paste0(round(n / sum(n) * 100, 0), "%")) %>%
-  kable(col.names = c("Treatment", "Gender", "N", "%"), caption = "Gender by Treatment")
+data.frame(
+  Variable = c("source", "deviceType", "gender"),
+  p_value  = c(
+    round(fisher.test(table(user_level$treatment, user_level$source), 
+                      simulate.p.value = TRUE)$p.value, 4),
+    round(fisher.test(table(user_level$treatment, user_level$deviceType), 
+                      simulate.p.value = TRUE)$p.value, 4),
+    round(fisher.test(table(user_level$treatment, user_level$gender), 
+                      simulate.p.value = TRUE)$p.value, 4)
+  )
+) %>%
+  kable(caption = "Categorical Balance p-values (Fisher's exact)")
 ```
 
 ## Outcome Summary
@@ -292,187 +331,64 @@ df <- clean %>%
 cat("\nFinal dataset: ", n_distinct(df$userId), "users |", nrow(df), "rounds\n")
 cat("Rounds per treatment:\n")
 print(count(df, treatment))
+
+# Save clean analysis dataset for downstream Rmds
+saveRDS(df,                "analysis_data.rds")
+saveRDS(experiment_master, "experiment_master.rds")
+cat("Saved analysis_data.rds and experiment_master.rds\n")
 ```
 
-## Primary Model 1: log(timeEngaged)
+## Attrition Analysis
 
-Mixed effects model with random intercept per user (rounds nested within
-users). Reference: treatment = no_label, puzzleId = puzzle_01.
-Cluster-robust SEs (CR1, Satterthwaite df) account for within-user
-correlation. Lean spec (treatment + puzzleId + puzzleSkill) is primary;
-full covariate model is robustness check.
-
-```{r primary-model}
-run_primary <- function(data) {
-  # Lean model
-  m_lean    <- lmer(logTE ~ treatment + puzzleId + puzzleSkill + (1 | userId),
-                    data = data, REML = FALSE)
-  vcov_lean <- vcovCR(m_lean, cluster = data$userId, type = "CR1")
-  rt_lean   <- coef_test(m_lean, vcov = vcov_lean, test = "Satterthwaite")
-  
-  # Full model
-  m_full    <- lmer(logTE ~ treatment + puzzleId +
-                      puzzleSkill + age + quantitativeExposure + energyLevel +
-                      deviceType + tabSwitchTimePaused + (1 | userId),
-                    data = data, REML = FALSE)
-  vcov_full <- vcovCR(m_full, cluster = data$userId, type = "CR1")
-  rt_full   <- coef_test(m_full, vcov = vcov_full, test = "Satterthwaite")
-  
-  trt_lean <- grepl("^treatment", rt_lean$Coef)
-  trt_full <- grepl("^treatment", rt_full$Coef)
-  
-  bind_rows(
-    data.frame(model = "Lean", term = rt_lean$Coef[trt_lean],
-               est = round(rt_lean$beta[trt_lean], 3),
-               se  = round(rt_lean$SE[trt_lean], 3),
-               t   = round(rt_lean$tstat[trt_lean], 3),
-               p   = round(rt_lean$p_Satt[trt_lean], 4)),
-    data.frame(model = "Full", term = rt_full$Coef[trt_full],
-               est = round(rt_full$beta[trt_full], 3),
-               se  = round(rt_full$SE[trt_full], 3),
-               t   = round(rt_full$tstat[trt_full], 3),
-               p   = round(rt_full$p_Satt[trt_full], 4))
+```{r attrition, results = 'asis'}
+all_users <- experiment_master %>%
+  distinct(userId, .keep_all = TRUE) %>%
+  mutate(
+    dropped   = as.integer(sessionComplete != TRUE),
+    source    = ifelse(!is.na(prolificPid), "Prolific", "Organic"),
+    treatment = relevel(factor(treatment), ref = "no_label")
   )
-}
 
-bind_rows(
-  run_primary(df)          %>% mutate(sample = "Full"),
-  run_primary(df_prolific) %>% mutate(sample = "Prolific"),
-  run_primary(df_organic)  %>% mutate(sample = "Organic")
-) %>%
-  select(sample, model, term, est, se, t, p) %>%
-  arrange(term, model, sample) %>%
-  mutate(p_adj = round(p.adjust(p, method = "BH"), 4)) %>%
-  kable(caption = "Primary Model (logTE): Lean and Full by Sample (cluster-robust SEs)")
+# Attrition rates table
+all_users %>%
+  group_by(source, treatment) %>%
+  summarize(
+    n_started     = n(),
+    n_dropped     = sum(dropped),
+    attrition_pct = paste0(round(mean(dropped) * 100, 1), "%"),
+    .groups = "drop"
+  ) %>%
+  kable(caption = "Attrition by Treatment Arm and Recruitment Source")
+
+# Fit models
+m_att_full     <- glm(dropped ~ treatment, data = all_users, family = binomial)
+m_att_organic  <- glm(dropped ~ treatment, data = filter(all_users, source == "Organic"), family = binomial)
+m_att_prolific <- glm(dropped ~ treatment, data = filter(all_users, source == "Prolific"), family = binomial)
+
+stargazer(m_att_full, m_att_organic, m_att_prolific,
+          type             = "text",
+          column.labels    = c("Full", "Organic", "Prolific"),
+          covariate.labels = c("Easy Label", "Hard Label"),
+          dep.var.labels   = "Dropped Out",
+          title            = "Differential Attrition: Effect of Treatment on Dropout",
+          digits           = 3,
+          star.cutoffs     = c(0.05, 0.01, 0.001),
+          report           = "vcs*p")
+
+# Completer vs dropout baseline comparison
+all_users %>%
+  group_by(completed = ifelse(dropped == 0, "Completed", "Dropped")) %>%
+  summarize(
+    n                  = n(),
+    Age                = round(mean(age, na.rm = TRUE), 1),
+    `Puzzle Skill`     = median(puzzleSkill, na.rm = TRUE),
+    `Puzzle Enjoyment` = median(puzzleEnjoyment, na.rm = TRUE),
+    `Energy Level`     = median(energyLevel, na.rm = TRUE),
+    `% Prolific`       = paste0(round(mean(source == "Prolific") * 100, 1), "%")
+  ) %>%
+  kable(caption = "Baseline Characteristics: Completers vs Dropouts")
 ```
 
-## Primary Model 2: Zero-Attempt Skip Rate
+---
 
-Zero-attempt skips (didSkip + attemptCount == 0) measure cold
-disengagement — giving up without trying. This is the primary binary
-outcome. Normal-approximation z-tests (adequate with n \> 200).
-
-```{r zero-att-skip-model}
-run_zas <- function(data) {
-  m <- glmer(
-    zero_att_skip ~ treatment + puzzleId + scale(puzzleSkill) + (1 | userId),
-    data = data, family = binomial,
-    control = glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 2e5))
-  )
-  cs   <- coef(summary(m))
-  rows <- grep("^treatment", rownames(cs))
-  data.frame(
-    term = rownames(cs)[rows],
-    OR   = round(exp(cs[rows, "Estimate"]), 3),
-    z    = round(cs[rows, "z value"], 3),
-    p    = round(cs[rows, "Pr(>|z|)"], 4)
-  )
-}
-
-df_prolific <- df %>% filter(!is.na(prolificPid))
-df_organic  <- df %>% filter(is.na(prolificPid))
-
-zas_full     <- run_zas(df)          %>% mutate(sample = "Full")
-zas_prolific <- run_zas(df_prolific) %>% mutate(sample = "Prolific")
-zas_organic  <- run_zas(df_organic)  %>% mutate(sample = "Organic")
-
-bind_rows(zas_prolific, zas_organic, zas_full) %>%
-  select(sample, term, OR, z, p) %>%
-  arrange(term, sample) %>%
-  kable(caption = "Zero-Attempt Skip Model: OR by Sample (exploratory; raw p-values)")
-```
-
-## Consistency Check: Attempt Count Among Skippers
-
-Among rounds that ended in a skip, did the label change how hard people
-tried before giving up? Complements the zero-att skip finding:
-easy_label → more attempts before quitting (not just fewer cold quits).
-Outcome: log(attemptCount + 1). Models use cluster-robust SEs.
-
-```{r att-skippers}
-# All puzzles
-df_skip <- df %>% filter(didSkip == TRUE, puzzleId != "puzzle_04")
-cat("Skipped rounds (excl. puzzle_04):", nrow(df_skip), "from", n_distinct(df_skip$userId), "users\n")
-
-m_att_all  <- lmer(logAtt ~ treatment + puzzleId + puzzleSkill + (1 | userId),
-                   data = df_skip, REML = FALSE)
-rv_att_all <- vcovCR(m_att_all, cluster = df_skip$userId, type = "CR1")
-rt_att_all <- coef_test(m_att_all, vcov = rv_att_all, test = "Satterthwaite")
-trt_a      <- grepl("treatment", rt_att_all$Coef)
-
-data.frame(
-  Estimate = round(rt_att_all$beta[trt_a], 4),
-  SE       = round(rt_att_all$SE[trt_a], 4),
-  t        = round(rt_att_all$tstat[trt_a], 3),
-  p_Satt   = round(rt_att_all$p_Satt[trt_a], 4),
-  row.names = rt_att_all$Coef[trt_a]
-) %>% kable(caption = "log(attempts+1) among skippers — all hard/medium puzzles (exploratory)")
-
-# Hard number sequences only (puzzle_01 + puzzle_05)
-df_hard_skip <- df %>% filter(puzzleId %in% c("puzzle_01", "puzzle_05"), didSkip == TRUE)
-cat("\nHard puzzle (p01+p05) skipped rounds:", nrow(df_hard_skip),
-    "from", n_distinct(df_hard_skip$userId), "users\n")
-
-m_att_hard  <- lmer(logAtt ~ treatment + puzzleId + puzzleSkill + (1 | userId),
-                    data = df_hard_skip, REML = FALSE)
-rv_att_hard <- vcovCR(m_att_hard, cluster = df_hard_skip$userId, type = "CR1")
-rt_att_hard <- coef_test(m_att_hard, vcov = rv_att_hard, test = "Satterthwaite")
-trt_h       <- grepl("treatment", rt_att_hard$Coef)
-
-data.frame(
-  Estimate = round(rt_att_hard$beta[trt_h], 4),
-  SE       = round(rt_att_hard$SE[trt_h], 4),
-  t        = round(rt_att_hard$tstat[trt_h], 3),
-  p_Satt   = round(rt_att_hard$p_Satt[trt_h], 4),
-  row.names = rt_att_hard$Coef[trt_h]
-) %>% kable(caption = "log(attempts+1) among skippers — puzzle_01 + puzzle_05 only (exploratory)")
-
-df_hard_skip %>%
-  group_by(treatment, puzzleId) %>%
-  summarize(n = n(), mean_att = round(mean(attemptCount), 2),
-            pct_zero_att = round(mean(attemptCount == 0) * 100, 1), .groups = "drop") %>%
-  arrange(puzzleId, treatment) %>%
-  kable(caption = "Raw means — avg attempts before skip on hard puzzles")
-```
-
-## Robustness: Overall Skip Rate & Solve Rate
-
-```{r robustness-models}
-# Overall skip rate
-m_skip <- suppressWarnings(glmer(
-  didSkip ~ treatment + puzzleId + puzzleSkill + (1 | userId),
-  data = df, family = binomial, control = glmerControl(optimizer = "bobyqa")
-))
-cs_skip <- coef(summary(m_skip))
-cat("--- Overall skip (didSkip) ---\n")
-for (r in c("treatmenteasy_label", "treatmenthard_label"))
-  cat(sprintf("  %s: OR=%.3f  p=%.4f\n", r, exp(cs_skip[r, "Estimate"]),
-              2 * pnorm(abs(cs_skip[r, "z value"]), lower.tail = FALSE)))
-
-# Solve rate
-m_solve <- suppressWarnings(glmer(
-  isSolved ~ treatment + puzzleId + puzzleSkill + (1 | userId),
-  data = df, family = binomial, control = glmerControl(optimizer = "bobyqa")
-))
-cs_solve <- coef(summary(m_solve))
-cat("\n--- Solve rate (isSolved) ---\n")
-for (r in c("treatmenteasy_label", "treatmenthard_label"))
-  cat(sprintf("  %s: OR=%.3f  p=%.4f\n", r, exp(cs_solve[r, "Estimate"]),
-              2 * pnorm(abs(cs_solve[r, "z value"]), lower.tail = FALSE)))
-
-# logTE among solvers only
-clean_solved <- df %>% filter(isSolved == TRUE)
-m_solved <- lmer(logTE ~ treatment + puzzleId + puzzleSkill + (1 | userId),
-                 data = clean_solved, REML = FALSE)
-rv_sol <- vcovCR(m_solved, cluster = clean_solved$userId, type = "CR1")
-rt_sol <- coef_test(m_solved, vcov = rv_sol, test = "Satterthwaite")
-trt_s <- grepl("treatment", rt_sol$Coef)
-cat("\n--- logTE among solved rounds only ---\n")
-print(data.frame(
-  Estimate = round(rt_sol$beta[trt_s], 4),
-  SE       = round(rt_sol$SE[trt_s], 4),
-  t        = round(rt_sol$tstat[trt_s], 3),
-  p_Satt   = round(rt_sol$p_Satt[trt_s], 4),
-  row.names = rt_sol$Coef[trt_s]
-))
-```
+*Modeling and results are in `modeling_scratch.Rmd` and `report.Rmd`. Load `analysis_data.rds` to access the final analysis dataset.*
