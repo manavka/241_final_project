@@ -33,36 +33,113 @@ df_prolific <- df %>% filter(source == "Prolific")
 df_organic  <- df %>% filter(source == "Organic")
 ```
 
-## Treatment
+## Study Design
+
+### Procedure
+
+The experiment was delivered as a browser-based web application at
+anotherpuzzle.io. The application was a single-page JavaScript game
+engine that managed the complete participant session — from recruitment
+intake through behavioral data collection — without any researcher
+intervention at runtime. All data were logged directly to a cloud
+database (Firestore) at both the session and round levels.
+
+Upon arriving at the application, participants were presented with a
+consent screen. Participants who agreed were immediately and invisibly
+assigned to one of three treatment arms before proceeding. Following
+consent, participants completed an eight-item survey collecting baseline
+covariates: age, gender, education level, quantitative exposure, current
+energy level, puzzle frequency, self-rated puzzle skill, and puzzle
+enjoyment. After the survey, participants were shown a brief instruction
+screen and then clicked "Start the Challenge," which triggered
+randomization of puzzle order and treatment assignment and the creation
+of the participant's session record.
+
+The game engine logged behavioral data at the round level. For each
+round, it recorded: total time engaged (a continuous timer that paused
+automatically during tab switches and participant-initiated breaks),
+number of answer attempts, whether the first attempt was correct, time
+to first attempt, tab-switch count and total time paused, rage-click
+events, and whether the round ended in a solve or a skip. Skip was
+enabled after 30 seconds of engagement, preventing immediate abandonment
+without any attempt. At the session level, the engine recorded device
+type, puzzle presentation order, recruitment source, and session
+completion status.
+
+### Treatment
 
 The experimental treatment was a difficulty label presented to
 participants before each logic puzzle, designed to prime expectations
 about puzzle difficulty prior to engagement. The anticipated mechanism
-was that these primed expectations would influence persistence —
-measured as time spent on a puzzle before solving or skipping.
+was that these primed expectations would influence persistence, measured
+as time spent on a puzzle before solving or skipping.
 
 Participants were randomly assigned at session entry to one of three
-conditions: (1) no label, (2) easy label, or (3) hard label. Within the
-application, all other aspects of the experience were held constant
-across arms — the interface, instructions, and the five logic puzzles —
-so differences in behavior across treatment groups can be attributed to
-the difficulty label.
+conditions: (1) no label, (2) easy label, or (3) hard label. The
+assigned label was shown before every puzzle in the session, so a
+participant assigned to the hard label condition saw that label at the
+start of each of the five rounds. Within the application, all other
+aspects of the experience were held constant across arms. The interface,
+instructions, and the five logic puzzles were identical across
+conditions, so differences in behavior across treatment groups can be
+attributed to the difficulty label rather than any other feature of the
+experience.
 
-The study recruited from two populations with distinct incentive
-structures. Organic participants were recruited through personal
-networks with no standardized referral message and no financial
-incentive to complete the study. Prolific participants were recruited
-through the Prolific platform, which delivers a standardized study
-listing and compensates participants contingent on completion. Because
-participants arrived through different channels and under different
-incentive conditions, recruitment source may independently shape both
-attrition and engagement regardless of treatment. This is a known
-limitation of the design, and recruitment source is accounted for
-throughout the analysis rather than pooled away.
+Each session consisted of five logic puzzles presented in randomized
+order: a number sequence, an alphabet wheel, a shape sequence, a hybrid
+shape-number puzzle, and a tile sequence.
 
-Because participants completed five puzzle rounds, the analysis also
-accounts for differences among puzzles and for within-participant
-correlation across rounds.
+```{r puzzle-skip-rate}
+overall_rates <- df %>%
+  mutate(
+    Puzzle = case_when(
+      puzzleId == "puzzle_01" ~ "Number Sequence",
+      puzzleId == "puzzle_02" ~ "Alphabet Wheel",
+      puzzleId == "puzzle_03" ~ "Shape Sequence",
+      puzzleId == "puzzle_04" ~ "Hybrid Puzzle",
+      puzzleId == "puzzle_05" ~ "Tile Sequence"
+    )
+  ) %>%
+  group_by(Puzzle) %>%
+  summarize(overall_raw = mean(didSkip, na.rm = TRUE), .groups = "drop")
+
+df %>%
+  mutate(
+    Puzzle = case_when(
+      puzzleId == "puzzle_01" ~ "Number Sequence",
+      puzzleId == "puzzle_02" ~ "Alphabet Wheel",
+      puzzleId == "puzzle_03" ~ "Shape Sequence",
+      puzzleId == "puzzle_04" ~ "Hybrid Puzzle",
+      puzzleId == "puzzle_05" ~ "Tile Sequence"
+    )
+  ) %>%
+  group_by(Puzzle, treatment) %>%
+  summarize(skip_rate = mean(didSkip, na.rm = TRUE), .groups = "drop") %>%
+  pivot_wider(names_from = treatment, values_from = skip_rate) %>%
+  left_join(overall_rates, by = "Puzzle") %>%
+  arrange(desc(overall_raw)) %>%
+  mutate(across(c(no_label, easy_label, hard_label, overall_raw),
+                ~ paste0(round(. * 100, 1), "%"))) %>%
+  select(Puzzle, no_label, easy_label, hard_label, overall_raw) %>%
+  rename(
+    `No Label`   = no_label,
+    `Easy Label` = easy_label,
+    `Hard Label` = hard_label,
+    `Overall`    = overall_raw
+  ) %>%
+  kable(booktabs = TRUE,
+        caption  = "Skip Rate by Puzzle and Treatment Arm") %>%
+  kable_styling(latex_options = c("hold_position"))
+```
+
+All five puzzles were designed to be intentionally challenging, though
+they varied in how difficult participants found them in practice. Skip
+and solve rates differed meaningfully across puzzle types, as shown in
+Table \@ref(tab:puzzle-skip-rate). Puzzle order was randomized across
+participants to prevent any one puzzle from systematically falling at
+the same point in the session, and the analysis accounts for
+puzzle-level differences and within-participant correlation across
+rounds.
 
 Treatment delivery was controlled entirely through the application, and
 the data contain no indication that any participant was shown a label
