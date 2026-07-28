@@ -3,11 +3,13 @@ title: "The Effect of Difficulty Labels on Puzzle Engagement"
 author: ""
 date: "`r Sys.Date()`"
 output: bookdown::pdf_document2
+bibliography: references.bib
 header-includes:
   - \usepackage{booktabs}
   - \usepackage[table]{xcolor}
   - \usepackage{threeparttable}
   - \usepackage{multirow}
+  - \usepackage{float}
 editor_options:
   markdown:
     wrap: 72
@@ -26,6 +28,8 @@ library(clubSandwich)
 library(knitr)
 library(kableExtra)
 library(modelsummary)
+library(jsonlite)
+library(consort)
 
 master      <- readRDS("analysis_data.rds")
 df          <- master %>% filter(sessionComplete == TRUE)
@@ -33,14 +37,165 @@ df_prolific <- df %>% filter(source == "Prolific")
 df_organic  <- df %>% filter(source == "Organic")
 ```
 
+## Introduction
+
+### Theory
+
+Priming refers to the phenomenon by which exposure to a stimulus
+influences subsequent perception, cognition, or behavior. Early work on
+semantic priming established that related concepts are recognized faster
+when preceded by an associated word [@meyer1971facilitation], and
+neuroimaging research has since confirmed consistent neural signatures
+of repeated stimulus exposure [@lee2020neural]. Taken together, this
+body of evidence suggests that priming can shape cognitive processing in
+measurable ways.
+
+Our study tests whether explicit difficulty labels, a concrete and
+ecologically valid form of priming, alter persistence on cognitive
+tasks. Difficulty labels are a natural mechanism through which priming
+operates in everyday settings: a task framed as easy invites different
+expectations and effort allocation than the same task framed as hard.
+@kahneman2011thinking describes how the framing of information shapes
+intuitive judgment before deliberate reasoning engages, which suggests
+that a difficulty label encountered before a task begins could prime
+effort expectations that carry into performance.
+
+### Hypothesis
+
+We hypothesize that the two label conditions affect time engaged in
+opposite directions relative to the no label control. Participants shown
+the hard label receive accurate information about task difficulty and
+may mentally prepare for sustained effort, increasing persistence.
+Participants shown the easy label encounter a mismatch between their
+expectation and their experience: the puzzle is harder than primed,
+which we expect to produce frustration that shortens engagement. When
+participants expect a task to be easy and immediately find it is not,
+the experience may feel like failure rather than challenge, lowering the
+threshold for giving up and skipping.
+
+Formally:
+
+$$H_1: \mu_{\text{hard}} > \mu_{\text{no label}}$$
+$$H_2: \mu_{\text{easy}} < \mu_{\text{no label}}$$
+$$H_3: \mu_{\text{hard}} > \mu_{\text{easy}}$$
+
+where $\mu$ denotes mean time engaged per puzzle round.
+
+## Power Calculation
+
+To determine the necessary sample size, we conducted a simulation-based
+power analysis rather than relying on a closed-form analytic formula.
+This approach allows us to model the multi-round panel structure of the
+experiment and account for participant-level clustering.
+
+We set a control baseline average solve time of $\mu = 270$ seconds.
+Variance was decomposed into a between-person component ($\sigma_u = 60$
+seconds) and a within-person residual ($\sigma_e = 67$ seconds),
+yielding a total standard deviation of
+$\sigma = \sqrt{\sigma_u^2 + \sigma_e^2} \approx 90$ seconds, chosen
+conservatively to capture natural individual variation in performance.
+We specified treatment effects relative to the no label control in
+opposite directions for the two label arms: a $+25$ second increase for
+the hard label arm, reflecting anticipated persistence when participants
+are accurately primed for difficulty, and a $-25$ second decrease for
+the easy label arm, reflecting earlier disengagement when participants
+encounter a task harder than the label suggested.
+
+We simulated 500 iterations at escalating sample sizes. For each
+iteration, a mixed-effects model was fit with puzzle fixed effects and a
+participant-level random intercept:
+
+$$Y_{it} = \beta_0 + \boldsymbol{\beta}_{\text{trt}} \text{Treatment}_i + \boldsymbol{\gamma}_t + u_i + \varepsilon_{it}$$
+
+where $\boldsymbol{\gamma}_t$ are puzzle fixed effects and
+$u_i \sim N(0, \sigma_u^2)$ is a participant random intercept. Because
+data are generated exactly from the model, standard mixed-model
+$t$-tests are used to assess significance; cluster-robust standard
+errors are applied in the actual analysis but are not needed for
+simulation where the variance structure is known.
+
+```{r power-sim, message=FALSE, warning=FALSE}
+if (file.exists("power_sim_results.rds")) {
+  power_res <- readRDS("power_sim_results.rds")
+} else {
+  set.seed(241)
+  mu_base   <- 270; beta_hard <- 25; beta_easy <- -25
+  sigma_u   <-  60; sigma_e   <- 67; n_puzzles  <-  5; n_sim <- 500
+  puzzle_fx <- c(-15, 10, 20, -8, -7)
+
+  sim_power <- function(n_per_arm) {
+    sig_hard <- sig_easy <- logical(n_sim)
+    for (s in seq_len(n_sim)) {
+      n_total  <- n_per_arm * 3
+      trt_id   <- rep(c("no_label","easy_label","hard_label"), each = n_per_arm)
+      u_i      <- rnorm(n_total, 0, sigma_u)
+      userId   <- rep(seq_len(n_total), each = n_puzzles)
+      puzzleId <- rep(seq_len(n_puzzles), times = n_total)
+      trt_long <- rep(trt_id, each = n_puzzles)
+      beta_trt <- ifelse(trt_long == "hard_label", beta_hard,
+                  ifelse(trt_long == "easy_label", beta_easy, 0))
+      Y <- mu_base + beta_trt + puzzle_fx[puzzleId] + u_i[userId] +
+           rnorm(n_total * n_puzzles, 0, sigma_e)
+      dat <- data.frame(
+        Y         = Y,
+        treatment = factor(trt_long, levels = c("no_label","easy_label","hard_label")),
+        puzzleId  = factor(puzzleId),
+        userId    = factor(userId)
+      )
+      m <- tryCatch(lmer(Y ~ treatment + puzzleId + (1|userId),
+                         data = dat, REML = FALSE), error = function(e) NULL)
+      if (is.null(m)) next
+      ct <- summary(m)$coefficients
+      th <- ct["treatmenthard_label", "t value"]
+      te <- ct["treatmenteasy_label", "t value"]
+      if (length(th)) sig_hard[s] <- abs(th) > 1.96
+      if (length(te)) sig_easy[s] <- abs(te) > 1.96
+    }
+    data.frame(n_per_arm = n_per_arm,
+               power_hard = mean(sig_hard),
+               power_easy = mean(sig_easy))
+  }
+
+  power_res <- bind_rows(lapply(seq(40, 150, by = 10), sim_power))
+  saveRDS(power_res, "power_sim_results.rds")
+}
+
+thresh_hard <- power_res$n_per_arm[which(power_res$power_hard >= 0.80)[1]]
+thresh_easy <- power_res$n_per_arm[which(power_res$power_easy >= 0.80)[1]]
+thresh_both <- max(thresh_hard, thresh_easy, na.rm = TRUE)
+```
+
+At $\alpha = 0.05$, power to detect the hard label effect crosses the
+80% threshold at `r thresh_hard` participants per arm
+(`r thresh_hard * 3` total), and the easy label effect crosses 80% at
+`r thresh_easy` per arm (`r thresh_easy * 3` total). The
+harder-to-detect effect requires `r thresh_both` per arm
+(`r thresh_both * 3` total).
+
+The final analytic sample of 256 completers falls below the
+pre-specified target of `r thresh_both * 3`. Exclusions for behavioral
+flags and attrition reduced the sample beyond what was anticipated at
+the design stage, and arm sizes are unequal (No Label: 87, Easy Label:
+80, Hard Label: 89), which modestly reduces power relative to equal
+allocation. Beyond sample size, the analytic sample pools two
+recruitment populations that differ systematically in engagement
+conditions: Prolific participants completed the experiment in a
+structured, incentivized setting with low distraction, while organic
+participants, recruited through personal networks, varied more in
+motivation, setting, and distraction level. This heterogeneity inflates
+within-group variance beyond what a single $\sigma$ captures, further
+eroding effective power. Both the sample shortfall and the variance
+inflation from pooling two behaviorally distinct populations should be
+kept in mind when interpreting null or marginal findings.
+
 ## Study Design
 
 ### Procedure
 
 The experiment was delivered as a browser-based web application at
 anotherpuzzle.io. The application was a single-page JavaScript game
-engine that managed the complete participant session — from recruitment
-intake through behavioral data collection — without any researcher
+engine that managed the complete participant session from recruitment
+intake through behavioral data collection without any researcher
 intervention at runtime. All data were logged directly to a cloud
 database (Firestore) at both the session and round levels.
 
@@ -52,8 +207,8 @@ covariates: age, gender, education level, quantitative exposure, current
 energy level, puzzle frequency, self-rated puzzle skill, and puzzle
 enjoyment. After the survey, participants were shown a brief instruction
 screen and then clicked "Start the Challenge," which triggered
-randomization of puzzle order and treatment assignment and the creation
-of the participant's session record.
+randomization of puzzle order and the creation of the participant's
+session record.
 
 The game engine logged behavioral data at the round level. For each
 round, it recorded: total time engaged (a continuous timer that paused
@@ -69,10 +224,12 @@ completion status.
 ### Treatment
 
 The experimental treatment was a difficulty label presented to
-participants before each logic puzzle, designed to prime expectations
-about puzzle difficulty prior to engagement. The anticipated mechanism
-was that these primed expectations would influence persistence, measured
-as time spent on a puzzle before solving or skipping.
+participants before each logic puzzle. The hard label was expected to
+prompt mental preparation for a demanding task, increasing persistence.
+The easy label was expected to create an expectation mismatch:
+participants anticipating an easy task would encounter greater
+difficulty than expected, producing frustration that shortens engagement
+before participants choose to skip.
 
 Participants were randomly assigned at session entry to one of three
 conditions: (1) no label, (2) easy label, or (3) hard label. The
@@ -87,7 +244,9 @@ experience.
 
 Each session consisted of five logic puzzles presented in randomized
 order: a number sequence, an alphabet wheel, a shape sequence, a hybrid
-shape-number puzzle, and a tile sequence.
+shape-number puzzle, and a tile sequence. All five were designed to be
+intentionally challenging, though they varied in how difficult
+participants found them in practice.
 
 ```{r puzzle-skip-rate}
 overall_rates <- df %>%
@@ -132,10 +291,8 @@ df %>%
   kable_styling(latex_options = c("hold_position"))
 ```
 
-All five puzzles were designed to be intentionally challenging, though
-they varied in how difficult participants found them in practice. Skip
-and solve rates differed meaningfully across puzzle types, as shown in
-Table \@ref(tab:puzzle-skip-rate). Puzzle order was randomized across
+Skip and solve rates differed meaningfully across puzzle types, as shown
+in Table \@ref(tab:puzzle-skip-rate). Puzzle order was randomized across
 participants to prevent any one puzzle from systematically falling at
 the same point in the session, and the analysis accounts for
 puzzle-level differences and within-participant correlation across
@@ -150,9 +307,163 @@ each round, so perfect delivery could not be independently verified.
 Future experiments should log these separately to enable a formal
 compliance check.
 
+## Participants
+
+The experiment database contained 399 session records. One duplicate
+user ID was removed, leaving 398 unique participants. Eight were
+excluded as returning or replay players whose devices had previously
+completed a full session, leaving 390 first-time participants. An
+additional 27 had no retained gamelog records and were excluded,
+yielding 363 participants who started at least one puzzle round.
+
+Twenty-one participants were excluded for eligibility: 8 were under 18
+and 13 were rejected through Prolific's quality review. Of the remaining
+342 eligible participants, 39 were removed for behavioral or
+data-quality reasons:
+
+*Behavioral exclusions*
+
+1.  Total tab-switch pause time exceeded 600 seconds across the session,
+    indicating the participant was away from the browser for an extended
+    period.
+2.  At least one puzzle showed an idle walk-away pattern: the
+    participant skipped without switching tabs and with time engaged
+    above the 97th percentile of the skip-time distribution for that
+    puzzle, suggesting they left the page and returned.
+3.  All five puzzles were skipped within 30 to 35 seconds with no answer
+    attempts, indicating the participant waited out the skip-unlock
+    timer on every round rather than engaging with the puzzles.
+
+*AI assistance exclusions*
+
+4.  Self-reported use of AI assistance in the post-session honesty
+    check.
+5.  Hard puzzles solved on the first attempt faster than population
+    benchmarks for that puzzle (any single puzzle below the 5th
+    percentile, or two or more below the 10th), subject to manual
+    review. Flagged participants were retained if their fast solve times
+    were consistent with their relative performance across all rounds,
+    as genuine skill tends to produce proportionally fast times across
+    puzzles rather than selectively fast times on isolated ones.
+
+Attrition, defined as beginning treatment but failing to complete all
+five rounds, accounted for 47 participants. The final analytic sample is
+256 completers across three arms: No Label (n = 87), Easy Label (n =
+80), and Hard Label (n = 89). Figure \@ref(fig:fig-consort) shows the
+full participant flow.
+
+```{r fig-consort, fig.width=9, fig.height=7, fig.cap="Participant flow through the experiment.", fig.pos="H", out.width="\\textwidth"}
+
+raw_json  <- fromJSON("firestore_export.json", simplifyVector = FALSE)
+users_all <- tibble(document_id = names(raw_json$users),
+                    data        = raw_json$users) %>%
+  unnest_wider(data) %>%
+  distinct(userId, .keep_all = TRUE)
+
+new_player_ids <- users_all %>%
+  filter(!is.na(sharedDevice) & sharedDevice == "new_player") %>%
+  pull(userId)
+
+em_u          <- readRDS("experiment_master.rds") %>% distinct(userId, .keep_all = TRUE)
+master_u      <- master %>% distinct(userId, .keep_all = TRUE)
+completed_ids <- master_u %>% filter(sessionComplete == TRUE) %>% pull(userId)
+dropped_ids   <- master_u %>% filter(sessionComplete == FALSE) %>% pull(userId)
+
+arm_src <- master %>%
+  filter(sessionComplete == TRUE) %>%
+  distinct(userId, .keep_all = TRUE) %>%
+  count(treatment, source)
+
+gn <- function(trt, src) {
+  v <- arm_src %>% filter(treatment == trt, source == src) %>% pull(n)
+  if (length(v) == 0) 0L else v
+}
+n_no_org   <- gn("no_label",   "Organic")
+n_no_pro   <- gn("no_label",   "Prolific")
+n_easy_org <- gn("easy_label", "Organic")
+n_easy_pro <- gn("easy_label", "Prolific")
+n_hard_org <- gn("hard_label", "Organic")
+n_hard_pro <- gn("hard_label", "Prolific")
+
+flow <- users_all %>%
+  mutate(
+    exc_replay = case_when(
+      !is.na(sharedDevice) & sharedDevice == "returning" ~ "Returning player",
+      !is.na(isReplay) & isReplay == TRUE & !(userId %in% new_player_ids) ~ "Replay session",
+      TRUE ~ NA_character_
+    ),
+    after_replay = if_else(is.na(exc_replay), userId, NA_character_),
+    exc_no_game = case_when(
+      !is.na(exc_replay) ~ NA_character_,
+      !(userId %in% em_u$userId) ~ "No gamelog records",
+      TRUE ~ NA_character_
+    ),
+    started = if_else(
+      is.na(exc_replay) & (userId %in% em_u$userId), userId, NA_character_
+    ),
+    exc_elig = case_when(
+      !is.na(exc_replay) | !(userId %in% em_u$userId) ~ NA_character_,
+      !is.na(age) & age < 18 ~ "Age < 18",
+      !is.na(prolificRejected) & prolificRejected == TRUE ~ "Prolific rejection",
+      TRUE ~ NA_character_
+    ),
+    eligible = if_else(
+      is.na(exc_replay) & (userId %in% em_u$userId) & is.na(exc_elig),
+      userId, NA_character_
+    ),
+    exc_behav = case_when(
+      !is.na(exc_replay) | !(userId %in% em_u$userId) | !is.na(exc_elig) ~ NA_character_,
+      !(userId %in% master_u$userId) ~ "Behavioral or AI flag",
+      TRUE ~ NA_character_
+    ),
+    quality = if_else(
+      is.na(exc_replay) & (userId %in% em_u$userId) &
+        is.na(exc_elig) & (userId %in% master_u$userId),
+      userId, NA_character_
+    ),
+    exc_att = case_when(
+      !is.na(exc_replay) | !(userId %in% em_u$userId) |
+        !is.na(exc_elig) | !(userId %in% master_u$userId) ~ NA_character_,
+      userId %in% dropped_ids ~ "Did not complete all 5 rounds",
+      TRUE ~ NA_character_
+    ),
+    arm = case_when(
+      !(userId %in% completed_ids) ~ NA_character_,
+      treatment == "no_label" ~
+        paste0("No Label\nOrganic: ", n_no_org, "\nProlific: ", n_no_pro, "\n"),
+      treatment == "easy_label" ~
+        paste0("Easy Label\nOrganic: ", n_easy_org, "\nProlific: ", n_easy_pro, "\n"),
+      treatment == "hard_label" ~
+        paste0("Hard Label\nOrganic: ", n_hard_org, "\nProlific: ", n_hard_pro, "\n")
+    )
+  )
+
+p <- consort_plot(
+  data   = flow,
+  orders = c(
+    userId       = 'Users with a session record',
+    exc_replay   = 'Excluded',
+    after_replay = 'Non-replay participants',
+    exc_no_game  = 'Excluded',
+    started      = 'Participants who started',
+    exc_elig     = 'Excluded',
+    eligible     = 'Eligible participants',
+    exc_behav    = 'Excluded',
+    quality      = 'Passed quality checks',
+    exc_att      = 'Did not complete all 5 rounds',
+    arm          = 'Analyzed'
+  ),
+  side_box   = c('exc_replay', 'exc_no_game', 'exc_elig', 'exc_behav', 'exc_att'),
+  allocation = 'arm',
+  cex        = 0.7
+)
+
+plot(p)
+```
+
 ## Potential Outcomes
 
-Each participant has three potential outcomes — the time engaged they
+Each participant has three potential outcomes, the time engaged they
 would produce under each of the three label conditions:
 $Y_i(\text{no label})$, $Y_i(\text{easy label})$, and
 $Y_i(\text{hard label})$. By the fundamental problem of causal
@@ -162,30 +473,36 @@ potential outcomes independent of treatment assignment, allowing average
 potential outcomes to be estimated from group means.
 
 The primary comparisons of interest are the average treatment effects of
-each label condition relative to the `no label` control:
+each label condition relative to the no label control, and the direct
+contrast between the two label conditions:
 
 $$\tau_{\text{easy}} = E[Y_i(\text{easy label})] - E[Y_i(\text{no label})]$$
 
 $$\tau_{\text{hard}} = E[Y_i(\text{hard label})] - E[Y_i(\text{no label})]$$
 
-The `no label` arm serves as the reference group, representing
-engagement in the absence of any difficulty prime. The two primary
-comparisons — `easy label` versus `no label` and `hard label` versus
-`no label` — isolate the effect of priming participants with a
-difficulty expectation, holding everything else constant. A positive
-effect would indicate that priming increases persistence (time engaged);
-a negative effect would indicate it discourages it. The direction is
-expected to differ by label valence, with an easy prime potentially
-encouraging engagement and a hard prime potentially suppressing it.
+$$\tau_{\text{hard vs. easy}} = E[Y_i(\text{hard label})] - E[Y_i(\text{easy label})]$$
+
+The no label arm serves as the reference group, representing engagement
+in the absence of any difficulty prime. The first two comparisons
+isolate the effect of priming participants with a difficulty expectation
+relative to no expectation at all, holding everything else constant. The
+third captures whether the direction of the prime matters: even if both
+labels shift behavior away from the no-label baseline, the frustration
+mechanism and the persistence mechanism predict that their effects move
+in opposite directions. Consistent with the hypotheses, we expect
+$\tau_{\text{easy}} < 0$, reflecting frustration-driven disengagement,
+$\tau_{\text{hard}} > 0$, reflecting preparation-driven persistence, and
+$\tau_{\text{hard vs. easy}} > 0$, reflecting the combined spread
+between the two priming directions.
 
 ## Randomization and Attrition
 
 ### Randomization
 
 Treatment was assigned entirely client-side at the moment a participant
-clicked "I understand – let's go" on the consent screen. The game engine
-drew a single uniform random variate and mapped it to one of three arms
-with nearly equal probability:
+clicked "I understand -- let's go" on the consent screen. The game
+engine drew a single uniform random variate and mapped it to one of
+three arms with nearly equal probability:
 
 ```         
 r = Math.random()
@@ -197,18 +514,18 @@ Treatment = r < 0.333 ? 'no_label'
 `Math.random()` draws a number between 0 and 1 uniformly, with the unit
 interval cut into three equal slices. Each arm was assigned with
 approximately one-third probability. The treatment draw was written to a
-`localStorage` draft immediately after assignment, which occurs after
-the consent screen. Participants who closed and returned mid-session
-were shown a "Welcome back" screen that restored their original
-treatment from the draft, ensuring the draw was not re-rolled on page
-reload. A participant's IP address was additionally captured and stored
-under a separate `localStorage` key to detect whether a device had
-previously completed a full session. Returning devices were routed to a
-shared-device screening question where participants self-reported
-whether they were a new or returning player. Together, the IP-based flag
-and the self-report allowed us to distinguish true first-time sessions
-from replays and from new participants sharing a household device,
-retaining only genuine first sessions.
+`localStorage` draft immediately after assignment. Participants who
+closed and returned mid-session were shown a "Welcome back" screen that
+restored their original treatment from the draft, ensuring the draw was
+not re-rolled on page reload. A participant's IP address was
+additionally captured and stored under a separate `localStorage` key to
+detect whether a device had previously completed a full session.
+Returning devices were routed to a shared-device screening question
+where participants self-reported whether they were a new or returning
+player. Together, the IP-based flag and the self-report allowed us to
+distinguish true first-time sessions from replays and from new
+participants sharing a household device, retaining only genuine first
+sessions.
 
 ### Recruitment Populations
 
@@ -216,35 +533,33 @@ This study drew from two distinct recruitment populations. Because the
 recruitment source shapes both the attrition mechanism and potentially
 the outcome measures themselves, we identify each participant's source
 (organic or Prolific) and account for it throughout the analysis. The
-organic sample was recruited through personal networks – friends,
-family, and word of mouth – with no standardized referral message, no
-controlled timing, and no single delivery channel. Organic participants
-had no financial incentive to complete the study. The Prolific sample
-was recruited through the Prolific platform, which delivers a
-standardized study listing and compensates participants contingent on
-completion and quality of the effort. Prolific participants are likely
-to be experienced survey-takers operating under platform norms around
-task completion.
+organic sample was recruited through personal networks, friends, family,
+and word of mouth, with no standardized referral message, no controlled
+timing, and no single delivery channel. Organic participants had no
+financial incentive to complete the study. The Prolific sample was
+recruited through the Prolific platform, which delivers a standardized
+study listing and compensates participants contingent on completion and
+quality of effort. Prolific participants are likely to be experienced
+survey-takers operating under platform norms around task completion.
 
 ### Attrition
 
-Attrition is defined as beginning treatment, but failing to complete all
-five rounds. Specifically, a participant is counted as an attritor if
-they have a user record in the database – created at the moment they
-click "Start the Challenge" and are shown a Round 1 label card, but
-their session was never marked complete. Variable `sessionComplete` is
-set to TRUE only when a participant reaches the results screen after
-resolving all five rounds (each ending in either a correct answer or a
-skip). Participants who passed through the survey and opted out before
-clicking "Start the Challenge" are not counted as attritors, because no
-user record is created for them and they were never exposed to the
-treatment.
+Attrition is defined as beginning treatment but failing to complete all
+five rounds. A participant is counted as an attritor if they have a user
+record in the database, created at the moment they click "Start the
+Challenge" and are shown a Round 1 label card, but their session was
+never marked complete. The variable `sessionComplete` is set to TRUE
+only when a participant reaches the results screen after resolving all
+five rounds, each ending in either a correct answer or a skip.
+Participants who passed through the survey and opted out before clicking
+"Start the Challenge" are not counted as attritors because no user
+record is created for them and they were never exposed to the treatment.
 
-#### Differential Attrition in Organic and Prolific subsamples
+#### Differential Attrition in Organic and Prolific Subsamples
 
 The attrition analysis fits logistic regression models predicting
 dropout on treatment arm, estimated separately for the full sample and
-the organic subsample, with no_label as the reference arm. The Prolific
+the organic subsample, with no label as the reference arm. The Prolific
 subsample had zero dropout across all arms and is reported descriptively
 only.
 
@@ -269,7 +584,7 @@ get_or_p <- function(model, term) {
 }
 
 fmt_p <- function(p) {
-  if (is.na(p)) return("—")
+  if (is.na(p)) return("---")
   ifelse(p < .001, "<.001", as.character(round(p, 3)))
 }
 
@@ -323,12 +638,12 @@ attrition_tbl %>%
   mutate(
     OR = case_when(
       treatment == "No Label" ~ "ref.",
-      is.na(OR)              ~ "—",
+      is.na(OR)              ~ "---",
       TRUE                   ~ as.character(round(OR, 3))
     ),
     p = case_when(
-      treatment == "No Label" ~ "—",
-      is.na(p)               ~ "—",
+      treatment == "No Label" ~ "---",
+      is.na(p)               ~ "---",
       TRUE                   ~ sapply(p, fmt_p)
     )
   ) %>%
@@ -359,29 +674,31 @@ in the hard label arm. The easy label coefficient is negligible and
 non-significant (OR = `r org_easy_or`, p = `r org_easy_p`), providing no
 evidence of a difference from the control. The hard label arm shows a
 suggestive but non-significant reduction in dropout odds relative to no
-label (OR = `r org_hard_or`, p = `r org_hard_p`), contrary to the prior
-expectation that a hard label would discourage persistence. The
-difference in dropout rates across arms is not statistically
-significant, so we cannot conclude that differential attrition
-meaningfully biases the primary outcome estimates. If the pattern were
-real, the direction of bias would work against finding a treatment
-effect. The no label arm losing more participants than the hard label
-arm would leave the no label completers as a comparatively more select
-group, which would compress the estimated difference between arms. The
-Prolific subsample had zero dropout across all three arms and is
-reported descriptively only, consistent with payment-based compliance
-overriding any label effect on attrition (see Table
-\@ref(tab:tab-attrition)).
+label (OR = `r org_hard_or`, p = `r org_hard_p`), consistent with H1's
+prediction that a hard label primes persistence rather than
+discouragement. The difference in dropout rates across arms is not
+statistically significant, so we cannot conclude that differential
+attrition meaningfully biases the primary outcome estimates. If the
+pattern were real, the no label arm losing more participants than the
+hard label arm would leave the no label completers as a comparatively
+more select group, compressing the estimated difference between arms.
+The Prolific subsample had zero dropout across all three arms,
+consistent with payment-based compliance overriding any label effect on
+attrition (see Table \@ref(tab:tab-attrition)).
 
-## Intent-to-Treat & Covariate Balance
+## Completer Analysis & Covariate Balance
 
-Given the attrition observed above, the primary analysis proceeds on an
-intent-to-treat basis restricted to participants who completed all five
-rounds (`sessionComplete == TRUE`). This approach preserves the
-integrity of the original randomization, where treatment effects are
-estimated among those who received and complied with their assigned
-condition and avoids the additional assumptions required to impute
-outcomes for participants who dropped out.
+The primary analysis estimates average treatment effects among the 256
+participants who completed all five rounds. Restricting to completers
+introduces potential attrition bias if dropout is related to treatment.
+Prolific participants had zero dropout across all three arms. Among
+organic participants, differential attrition was not statistically
+significant, but the hard label arm showed a suggestive reduction in
+dropout relative to no label (OR = `r org_hard_or`, p = `r org_hard_p`).
+If this pattern reflects a real effect, the no label arm would lose a
+disproportionately higher share of participants, leaving its completers
+as a more select group and compressing estimated treatment effect
+differences toward zero.
 
 ```{r tab-balance}
 bal <- df %>%
@@ -418,20 +735,18 @@ modelsummary(
   kable_styling(latex_options = c("hold_position", "scale_down"), font_size = 9)
 ```
 
-Table @ref(tab:tab-balance) presents covariate balance across the three
+Table \@ref(tab:tab-balance) presents covariate balance across the three
 treatment arms among completers. Each column reports an OLS regression
-of one baseline characteristic on treatment indicators, with `no label`
-as the reference arm. None of the `easy label` or `hard label`
-coefficients reach conventional significance thresholds on any covariate
-— age, quantitative exposure, puzzle skill, puzzle enjoyment, energy
-level, recruitment source, device type, or gender. This indicates that
-the randomization produced comparable groups on all measured
-pre-treatment characteristics. The R² values are near zero throughout,
-confirming that treatment assignment explains essentially none of the
-variance in any baseline variable. This balance supports a clean
-intent-to-treat interpretation: observed differences in outcomes across
-arms are unlikely to reflect pre-existing differences in participant
-composition.
+of one baseline characteristic on treatment indicators, with no label as
+the reference arm. None of the easy label or hard label coefficients
+reach conventional significance thresholds on any covariate: age,
+quantitative exposure, puzzle skill, puzzle enjoyment, energy level,
+recruitment source, device type, or gender. The $R^2$ values are near
+zero throughout, confirming that treatment assignment explains
+essentially none of the variance in any baseline variable. This balance
+supports the validity of the completer analysis: observed differences in
+outcomes across arms are unlikely to reflect pre-existing differences in
+participant composition.
 
 ## Discussion
 
