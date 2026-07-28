@@ -209,3 +209,54 @@ data.frame(
   row.names = rt_sol$Coef[trt_s]
 ) %>% kable(caption = "logTE among solved rounds only — robustness")
 ```
+
+
+
+## Secondary Model: Attempt count
+```{r}
+run_primary <- function(data) {
+  # Lean model
+  m_lean    <- lmer(logAtt ~ treatment + puzzleId + puzzleSkill + (1 | userId),
+                    data = data, REML = FALSE)
+  vcov_lean <- vcovCR(m_lean, cluster = data$userId, type = "CR1")
+  rt_lean   <- coef_test(m_lean, vcov = vcov_lean, test = "Satterthwaite")
+
+  # Full model
+  m_full    <- lmer(logAtt ~ treatment + puzzleId +
+                      puzzleSkill + age + quantitativeExposure + energyLevel +
+                      deviceType + tabSwitchTimePaused + (1 | userId),
+                    data = data, REML = FALSE)
+  vcov_full <- vcovCR(m_full, cluster = data$userId, type = "CR1")
+  rt_full   <- coef_test(m_full, vcov = vcov_full, test = "Satterthwaite")
+
+  trt_lean <- grepl("^treatment", rt_lean$Coef)
+  trt_full <- grepl("^treatment", rt_full$Coef)
+
+  bind_rows(
+    data.frame(model = "Lean", term = rt_lean$Coef[trt_lean],
+               est = round(rt_lean$beta[trt_lean], 3),
+               se  = round(rt_lean$SE[trt_lean], 3),
+               t   = round(rt_lean$tstat[trt_lean], 3),
+               p   = round(rt_lean$p_Satt[trt_lean], 4)),
+    data.frame(model = "Full", term = rt_full$Coef[trt_full],
+               est = round(rt_full$beta[trt_full], 3),
+               se  = round(rt_full$SE[trt_full], 3),
+               t   = round(rt_full$tstat[trt_full], 3),
+               p   = round(rt_full$p_Satt[trt_full], 4))
+  )
+}
+
+bind_rows(
+  run_primary(df)          %>% mutate(sample = "Full"),
+  run_primary(df_prolific) %>% mutate(sample = "Prolific"),
+  run_primary(df_organic)  %>% mutate(sample = "Organic")
+) %>%
+  select(sample, model, term, est, se, t, p) %>%
+  arrange(term, model, sample) %>%
+  mutate(p_adj = round(p.adjust(p, method = "BH"), 4)) %>%
+  kable(caption = "Primary Model (logAtt): Lean and Full by Sample (cluster-robust SEs, BH-adjusted)")
+
+
+```
+
+
