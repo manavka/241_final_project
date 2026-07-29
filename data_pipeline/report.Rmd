@@ -324,8 +324,7 @@ compliance check.
 
 ## Participants
 
-The experiment database contained 399 session records. One duplicate
-user ID was removed, leaving 398 unique participants. Eight were
+The experiment database contained 398 unique participants. Eight were
 excluded as returning or replay players whose devices had previously
 completed a full session, leaving 390 first-time participants. An
 additional 27 had no retained gamelog records and were excluded,
@@ -1081,18 +1080,24 @@ ggplot(coef_df, aes(x = est, y = term)) +
 ```
 
 As shown in Figure \@ref(fig:fig-skip-coef), the easy label coefficient
-is negative — pointing toward fewer cold skips relative to no label —
-but the confidence interval is wide and crosses zero in the full sample.
-The hard label estimate is close to zero with a wide interval in both
-directions, so there's no real signal there. This lines up with the
-table: whatever label effect exists on zero-attempt skipping is in the
-easy condition, and even there it's modest.
+is negative and pointing toward fewer cold skips relative to no label.
+However, thee confidence interval is wide and crosses zero in the full
+sample. The hard label estimate is close to zero with a wide interval in
+both directions, so there's no real signal there.
 
-One way to read this is that being told a puzzle is easy makes skipping
-without trying feel less acceptable — if it's supposed to be easy, you
-feel like you should at least give it a shot. This seems to be a
-stronger effect for Prolific participants, who may be more attentive to
-how tasks are framed given the incentive structure of the platform.
+The difference in the easy label's effect between Prolific and organic
+participants likely reflects differences in how each group engages with
+task framing. Prolific participants are experienced study participants
+who tend to read instructions carefully and take task cues seriously —
+when told a puzzle is easy, they internalize that label and may feel a
+stronger obligation to at least attempt an answer before skipping.
+Organic participants, recruited informally through personal networks,
+tend to be more distracted and less attentive to framing; we also found
+they spent significantly more time with the browser tab inactive,
+suggesting more real-world interruptions that could override any label
+effect. In short, the easy label appears to work by making cold-skipping
+feel less acceptable, but that mechanism requires the participant to be
+paying attention to the framing in the first place.
 
 ## Appendix
 
