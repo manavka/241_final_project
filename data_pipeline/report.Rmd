@@ -38,6 +38,9 @@ df_organic  <- df %>% filter(source == "Organic")
 ```
 
 ## Introduction
+The perceived difficulty of a task can affect the amount of mental or effort a person invests in a given task. Our experiment posed the question “Does perceived difficult affect the time engaged when doing challenging logic puzzles?”  Our participants will be given the same set of hard logic puzzles, and will be randomly assigned to one of 3 groups, no difficulty label, accurate difficulty label(hard difficulty), and understated difficulty label(easy difficulty). We will then compare the difference in mean time engaged across groups to asses if there is a significant difference in time engaged between the groups.
+ A systematic review of perceived task difficulty concluded that ‘Individuals are best engaged in tasks with moderate difficulty levels. Perceived task difficulty is influenced by the individuals’ information about the task, their emotions, and perceived self-ability.’[1]
+By varying the difficulty label associated with the puzzles, we can influence the participants perceived task difficulty, to see what effect it may have on the time they spent engaged with the logic puzzles. Since individuals are best engaged in tasks with moderate difficulty labels, we hypothesize that the group that receives an accurate label (hard) will have a significantly lower time engaged compared to the other 2 groups. 
 
 ### Theory
 
