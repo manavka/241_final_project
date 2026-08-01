@@ -1130,6 +1130,164 @@ effect. In short, the easy label appears to work by making cold-skipping
 feel less acceptable, but that mechanism requires the participant to be
 paying attention to the framing in the first place.
 
+
+### Secondary Model: Effect of Difficulty Labels on Time Before Skipping
+
+#### Outcome Description
+#### Model Specification
+
+Similar to the primary model, we estimated the effect of difficulty labels on log time engaged before skipping. This is a linear mixed-effects model with puzzle fixed effects, a participant-level random intercept, and pre-treatment covariates:
+
+$$\log(\text{TimeEngagedBeforeSkip}_{it}) = \beta_0 + \beta_1 \text{EasyLabel}_i + \beta_2 \text{HardLabel}_i + \mathbf{X}_i'\boldsymbol{\delta} + \varepsilon_{it}$$
+
+```{r prepare-skip-robustness, include=FALSE}
+
+prepare_skip_sample <- function(data) {
+  data %>%
+    filter(didSkip == TRUE) %>%
+    drop_na(
+      timeEngaged,
+      treatment,
+      puzzleId,
+      puzzleSkill,
+      age,
+      quantitativeExposure,
+      energyLevel,
+      deviceType,
+      userId
+    ) %>%
+    mutate(
+      treatment = relevel(
+        factor(treatment),
+        ref = "no_label"
+      ),
+      puzzleId = relevel(
+        factor(puzzleId),
+        ref = "puzzle_01"
+      ),
+      logTE = log(timeEngaged + 1)
+    )
+}
+
+skip_full <- prepare_skip_sample(df) %>%
+  drop_na(source)
+
+skip_org <- prepare_skip_sample(df_organic)
+
+skip_pro <- prepare_skip_sample(df_prolific)
+
+```
+
+```{r, include=FALSE}
+tibble(
+  Sample = c("Full", "Organic", "Prolific"),
+  `Skipped Rounds` = c(
+    nrow(skip_full),
+    nrow(skip_org),
+    nrow(skip_pro)
+  ),
+  Participants = c(
+    n_distinct(skip_full$userId),
+    n_distinct(skip_org$userId),
+    n_distinct(skip_pro$userId)
+  )
+)
+```
+
+
+
+```{r fit-skip-robustness, include=FALSE}
+
+
+fit_skip_source <- function(data, control_source = FALSE) {
+
+  fmla <- if (control_source) {
+    logTE ~ treatment + puzzleId + puzzleSkill + source +
+      age + quantitativeExposure + energyLevel + deviceType +
+      (1 | userId)
+  } else {
+    logTE ~ treatment + puzzleId + puzzleSkill +
+      age + quantitativeExposure + energyLevel + deviceType +
+      (1 | userId)
+  }
+
+  m <- lmer(
+    fmla,
+    data = data,
+    REML = FALSE
+  )
+
+  vc <- vcovCR(
+    m,
+    cluster = data$userId,
+    type = "CR1"
+  )
+
+  rt <- coef_test(
+    m,
+    vcov = vc,
+    test = "Satterthwaite"
+  )
+
+  list(
+    m = m,
+    se = sqrt(diag(vc)),
+    p = rt$p_Satt,
+    rt = rt
+  )
+}
+
+skip_fit_full <- fit_skip_source(
+  skip_full,
+  control_source = TRUE
+)
+
+skip_fit_org <- fit_skip_source(skip_org)
+
+skip_fit_pro <- fit_skip_source(skip_pro)
+
+```
+
+
+
+```{r tab-skip-source-final, results="asis", message=FALSE, warning=FALSE}
+stargazer(
+  skip_fit_full$m,
+  skip_fit_org$m,
+  skip_fit_pro$m,
+  se               = list(
+    skip_fit_full$se,
+    skip_fit_org$se,
+    skip_fit_pro$se
+  ),
+  p                = list(
+    skip_fit_full$p,
+    skip_fit_org$p,
+    skip_fit_pro$p
+  ),
+  type             = "latex",
+  title            = "Effect of Difficulty Labels on Time Before Skipping",
+  dep.var.caption  = "",
+  dep.var.labels   = c("Full", "Organic", "Prolific"),
+  multicolumn      = FALSE,
+  covariate.labels = c("Easy Label", "Hard Label"),
+  keep             = c(
+    "treatmenteasy_label",
+    "treatmenthard_label"
+  ),
+  report           = "vc*sp",
+  omit.stat        = c("f", "ser", "ll", "aic", "bic"),
+  label            = "tab:tab-skip-source",
+  header           = FALSE,
+  table.placement  = "H",
+  font.size        = "small",
+  notes            = "Mixed-effects models; CR1 cluster-robust SEs by participant."
+)
+```
+
+
+
+
 ## Appendix
 
 ### A. Residual Diagnostics
