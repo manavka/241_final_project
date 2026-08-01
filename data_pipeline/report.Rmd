@@ -1,0 +1,1298 @@
+---
+title: "The Effect of Difficulty Labels on Puzzle Engagement"
+author: ""
+date: "`r Sys.Date()`"
+output: bookdown::pdf_document2
+bibliography: references.bib
+header-includes:
+  - \usepackage{booktabs}
+  - \usepackage[table]{xcolor}
+  - \usepackage{threeparttable}
+  - \usepackage{multirow}
+  - \usepackage{float}
+  - \usepackage{graphicx}
+editor_options:
+  markdown:
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = TRUE, message = TRUE, error = TRUE)
+```
+
+```{r load-data, include=FALSE}
+library(dplyr)
+library(tidyr)
+library(purrr)
+library(lme4)
+library(clubSandwich)
+library(knitr)
+library(kableExtra)
+library(modelsummary)
+library(jsonlite)
+library(consort)
+library(ggplot2)
+library(patchwork)
+library(stargazer)
+
+master      <- readRDS("analysis_data.rds")
+df          <- master %>% filter(sessionComplete == TRUE)
+df_prolific <- df %>% filter(source == "Prolific")
+df_organic  <- df %>% filter(source == "Organic")
+
+theme_set(theme_bw(base_size = 11))
+```
+
+## Introduction
+
+How difficult a task feels can shape how much effort a person puts into
+it. This experiment asked whether showing participants a difficulty
+label before a logic puzzle — telling them it is easy or hard — changes
+how long they stay engaged with it. Participants were given the same set
+of hard puzzles and randomly assigned to one of three conditions: no
+label, a hard label (accurate), or an easy label (understated). We
+compared mean time engaged across the three groups to test whether the
+label changed behavior. Prior work on perceived task difficulty suggests
+that the information people have about a task, along with their
+expectations going in, influences how much effort they invest. By
+varying the label shown before each puzzle, we manipulated those
+expectations and observed the effect on engagement.
+
+### Theory
+
+Priming is when exposure to one stimulus influences how you respond to
+the next. Research on semantic priming has shown that people recognize
+related words faster when preceded by an associated cue
+[@meyer1971facilitation], suggesting that prior context shapes how we
+process what comes next.
+
+@kahneman2011thinking extends this beyond words: he argues that System 1
+— the fast, intuitive mode of thinking — is continuously shaped by
+whatever context is available at the moment of judgment. A difficulty
+label shown before a task is exactly this kind of cue. Before a
+participant even reads the first clue, System 1 has already formed an
+expectation about how hard the task will be and how much effort it
+deserves. By the time deliberate reasoning engages, the frame is already
+set.
+
+When that frame is wrong — when someone primed with "easy" encounters a
+genuinely hard puzzle — the mismatch creates cognitive friction.
+@baumeister1998ego showed that sustained cognitive effort depletes a
+limited self-regulatory resource, lowering persistence over time. A
+violated expectation compounds this: participants are not just working
+against the puzzle, they are also working against their own prior
+expectation of how this should feel. That additional load, we argue,
+lowers the threshold for giving up.
+
+### Hypothesis
+
+We hypothesize that the two label conditions affect time engaged in
+opposite directions relative to the no label control. Participants shown
+the hard label receive accurate information about task difficulty and
+may mentally prepare for sustained effort, increasing persistence.
+Participants shown the easy label encounter a mismatch between their
+expectation and their experience: the puzzle is harder than primed,
+which we expect to produce frustration that shortens engagement. When
+participants expect a task to be easy and immediately find it is not,
+the experience may feel like failure rather than challenge, lowering the
+threshold for giving up and skipping. Formally:
+
+$$H_1: \mu_{\text{hard}} > \mu_{\text{no label}}$$
+$$H_2: \mu_{\text{easy}} < \mu_{\text{no label}}$$
+$$H_3: \mu_{\text{hard}} > \mu_{\text{easy}}$$
+
+where $\mu$ denotes mean time engaged per puzzle round.
+
+## Power Calculation
+
+To determine the necessary sample size, we conducted a simulation-based
+power analysis rather than relying on a closed-form analytic formula.
+This approach allows us to model the multi-round panel structure of the
+experiment and account for participant-level clustering.
+
+We set a control baseline average solve time of $\mu = 270$ seconds.
+Variance was decomposed into a between-person component ($\sigma_u = 60$
+seconds) and a within-person residual ($\sigma_e = 67$ seconds),
+yielding a total standard deviation of
+$\sigma = \sqrt{\sigma_u^2 + \sigma_e^2} \approx 90$ seconds, chosen
+conservatively to capture natural individual variation in performance.
+We specified treatment effects relative to the no label control in
+opposite directions for the two label arms: a $+25$ second increase for
+the hard label arm, reflecting anticipated persistence when participants
+are accurately primed for difficulty, and a $-25$ second decrease for
+the easy label arm, reflecting earlier disengagement when participants
+encounter a task harder than the label suggested.
+
+We simulated 500 iterations at escalating sample sizes. For each
+iteration, a mixed-effects model was fit with puzzle fixed effects and a
+participant-level random intercept:
+
+$$Y_{it} = \beta_0 + \boldsymbol{\beta}_{\text{trt}} \text{Treatment}_i + \boldsymbol{\gamma}_t + u_i + \varepsilon_{it}$$
+
+where $\boldsymbol{\gamma}_t$ are puzzle fixed effects and
+$u_i \sim N(0, \sigma_u^2)$ is a participant random intercept. Because
+data are generated exactly from the model, standard mixed-model
+$t$-tests are used to assess significance; cluster-robust standard
+errors are applied in the actual analysis but are not needed for
+simulation where the variance structure is known.
+
+```{r power-sim, message=FALSE, warning=FALSE}
+if (file.exists("power_sim_results.rds")) {
+  power_res <- readRDS("power_sim_results.rds")
+} else {
+  set.seed(241)
+  mu_base   <- 270; beta_hard <- 25; beta_easy <- -25
+  sigma_u   <-  60; sigma_e   <- 67; n_puzzles  <-  5; n_sim <- 500
+  puzzle_fx <- c(-15, 10, 20, -8, -7)
+
+  sim_power <- function(n_per_arm) {
+    sig_hard <- sig_easy <- logical(n_sim)
+    for (s in seq_len(n_sim)) {
+      n_total  <- n_per_arm * 3
+      trt_id   <- rep(c("no_label","easy_label","hard_label"), each = n_per_arm)
+      u_i      <- rnorm(n_total, 0, sigma_u)
+      userId   <- rep(seq_len(n_total), each = n_puzzles)
+      puzzleId <- rep(seq_len(n_puzzles), times = n_total)
+      trt_long <- rep(trt_id, each = n_puzzles)
+      beta_trt <- ifelse(trt_long == "hard_label", beta_hard,
+                  ifelse(trt_long == "easy_label", beta_easy, 0))
+      Y <- mu_base + beta_trt + puzzle_fx[puzzleId] + u_i[userId] +
+           rnorm(n_total * n_puzzles, 0, sigma_e)
+      dat <- data.frame(
+        Y         = Y,
+        treatment = factor(trt_long, levels = c("no_label","easy_label","hard_label")),
+        puzzleId  = factor(puzzleId),
+        userId    = factor(userId)
+      )
+      m <- tryCatch(lmer(Y ~ treatment + puzzleId + (1|userId),
+                         data = dat, REML = FALSE), error = function(e) NULL)
+      if (is.null(m)) next
+      ct <- summary(m)$coefficients
+      th <- ct["treatmenthard_label", "t value"]
+      te <- ct["treatmenteasy_label", "t value"]
+      if (length(th)) sig_hard[s] <- abs(th) > 1.96
+      if (length(te)) sig_easy[s] <- abs(te) > 1.96
+    }
+    data.frame(n_per_arm = n_per_arm,
+               power_hard = mean(sig_hard),
+               power_easy = mean(sig_easy))
+  }
+
+  power_res <- bind_rows(lapply(seq(40, 150, by = 10), sim_power))
+  saveRDS(power_res, "power_sim_results.rds")
+}
+
+thresh_hard <- power_res$n_per_arm[which(power_res$power_hard >= 0.80)[1]]
+thresh_easy <- power_res$n_per_arm[which(power_res$power_easy >= 0.80)[1]]
+thresh_both <- max(thresh_hard, thresh_easy, na.rm = TRUE)
+```
+
+At $\alpha = 0.05$, power to detect the hard label effect crosses the
+80% threshold at `r thresh_hard` participants per arm
+(`r thresh_hard * 3` total), and the easy label effect crosses 80% at
+`r thresh_easy` per arm (`r thresh_easy * 3` total). The
+harder-to-detect effect requires `r thresh_both` per arm
+(`r thresh_both * 3` total).
+
+The final analytic sample of 256 completers falls below the
+pre-specified target of `r thresh_both * 3`. Exclusions for behavioral
+flags and attrition reduced the sample beyond what was anticipated at
+the design stage, and arm sizes are unequal (No Label: 87, Easy Label:
+80, Hard Label: 89), which modestly reduces power relative to equal
+allocation. Beyond sample size, the analytic sample pools two
+recruitment populations that differ systematically in engagement
+conditions: Prolific participants completed the experiment in a
+structured, incentivized setting with low distraction, while organic
+participants, recruited through personal networks, varied more in
+motivation, setting, and distraction level. This heterogeneity inflates
+within-group variance beyond what a single $\sigma$ captures, further
+eroding effective power. Both the sample shortfall and the variance
+inflation from pooling two behaviorally distinct populations should be
+kept in mind when interpreting null or marginal findings.
+
+## Study Design
+
+### Procedure
+
+The experiment was delivered as a browser-based web application at
+anotherpuzzle.io. The application was a single-page JavaScript game
+engine that managed the complete participant session from recruitment
+intake through behavioral data collection without any researcher
+intervention at runtime. All data were logged directly to a cloud
+database (Firestore) at both the session and round levels.
+
+Upon arriving at the application, participants were presented with a
+consent screen. Participants who agreed were immediately and invisibly
+assigned to one of three treatment arms before proceeding. Following
+consent, participants completed an eight-item survey collecting baseline
+covariates: age, gender, education level, quantitative exposure, current
+energy level, puzzle frequency, self-rated puzzle skill, and puzzle
+enjoyment. After the survey, participants were shown a brief instruction
+screen and then clicked "Start the Challenge," which triggered
+randomization of puzzle order and the creation of the participant's
+session record.
+
+The game engine logged behavioral data at the round level. For each
+round, it recorded: total time engaged (a continuous timer that paused
+automatically during tab switches and participant-initiated breaks),
+number of answer attempts, whether the first attempt was correct, time
+to first attempt, tab-switch count and total time paused, rage-click
+events, and whether the round ended in a solve or a skip. Skip was
+enabled after 30 seconds of engagement, preventing immediate abandonment
+without any attempt. At the session level, the engine recorded device
+type, puzzle presentation order, recruitment source, and session
+completion status.
+
+### Treatment
+
+The experimental treatment was a difficulty label presented to
+participants before each logic puzzle. The hard label was expected to
+prompt mental preparation for a demanding task, increasing persistence.
+The easy label was expected to create an expectation mismatch:
+participants anticipating an easy task would encounter greater
+difficulty than expected, producing frustration that shortens engagement
+before participants choose to skip.
+
+Participants were randomly assigned at session entry to one of three
+conditions: (1) no label, (2) easy label, or (3) hard label. The
+assigned label was shown before every puzzle in the session, so a
+participant assigned to the hard label condition saw that label at the
+start of each of the five rounds. Within the application, all other
+aspects of the experience were held constant across arms. The interface,
+instructions, and the five logic puzzles were identical across
+conditions, so differences in behavior across treatment groups can be
+attributed to the difficulty label rather than any other feature of the
+experience.
+
+Each session consisted of five logic puzzles presented in randomized
+order: a number sequence, an alphabet wheel, a shape sequence, a hybrid
+shape-number puzzle, and a tile sequence. All five were designed to be
+intentionally challenging, though they varied in how difficult
+participants found them in practice.
+
+```{r puzzle-skip-rate}
+overall_rates <- df %>%
+  mutate(
+    Puzzle = case_when(
+      puzzleId == "puzzle_01" ~ "Number Sequence",
+      puzzleId == "puzzle_02" ~ "Alphabet Wheel",
+      puzzleId == "puzzle_03" ~ "Shape Sequence",
+      puzzleId == "puzzle_04" ~ "Hybrid Puzzle",
+      puzzleId == "puzzle_05" ~ "Tile Sequence"
+    )
+  ) %>%
+  group_by(Puzzle) %>%
+  summarize(overall_raw = mean(didSkip, na.rm = TRUE), .groups = "drop")
+
+df %>%
+  mutate(
+    Puzzle = case_when(
+      puzzleId == "puzzle_01" ~ "Number Sequence",
+      puzzleId == "puzzle_02" ~ "Alphabet Wheel",
+      puzzleId == "puzzle_03" ~ "Shape Sequence",
+      puzzleId == "puzzle_04" ~ "Hybrid Puzzle",
+      puzzleId == "puzzle_05" ~ "Tile Sequence"
+    )
+  ) %>%
+  group_by(Puzzle, treatment) %>%
+  summarize(skip_rate = mean(didSkip, na.rm = TRUE), .groups = "drop") %>%
+  pivot_wider(names_from = treatment, values_from = skip_rate) %>%
+  left_join(overall_rates, by = "Puzzle") %>%
+  arrange(desc(overall_raw)) %>%
+  mutate(across(c(no_label, easy_label, hard_label, overall_raw),
+                ~ paste0(round(. * 100, 1), "%"))) %>%
+  select(Puzzle, no_label, easy_label, hard_label, overall_raw) %>%
+  rename(
+    `No Label`   = no_label,
+    `Easy Label` = easy_label,
+    `Hard Label` = hard_label,
+    `Overall`    = overall_raw
+  ) %>%
+  kable(booktabs = TRUE,
+        caption  = "Skip Rate by Puzzle and Treatment Arm") %>%
+  kable_styling(latex_options = c("hold_position"), font_size = 10)
+```
+
+Skip and solve rates differed meaningfully across puzzle types, as shown
+in Table \@ref(tab:puzzle-skip-rate). Puzzle order was randomized across
+participants to prevent any one puzzle from systematically falling at
+the same point in the session, and the analysis accounts for
+puzzle-level differences and within-participant correlation across
+rounds.
+
+Treatment delivery was controlled entirely through the application, and
+the data contain no indication that any participant was shown a label
+other than their assigned condition; we therefore identified no
+treatment non-compliers. However, the application did not independently
+log the randomized assignment alongside the label rendered on screen for
+each round, so perfect delivery could not be independently verified.
+Future experiments should log these separately to enable a formal
+compliance check.
+
+## Participants
+
+The experiment database contained 398 unique participants. Eight were
+excluded as returning or replay players whose devices had previously
+completed a full session, leaving 390 first-time participants. An
+additional 27 had no retained gamelog records and were excluded,
+yielding 363 participants who started at least one puzzle round.
+
+Twenty-one participants were excluded for eligibility: 8 were under 18
+and 13 were rejected through Prolific's quality review. Of the remaining
+342 eligible participants, 39 were removed for behavioral or
+data-quality reasons:
+
+*Behavioral exclusions*
+
+1.  Total tab-switch pause time exceeded 600 seconds across the session,
+    indicating the participant was away from the browser for an extended
+    period.
+2.  At least one puzzle showed an idle walk-away pattern: the
+    participant skipped without switching tabs and with time engaged
+    above the 97th percentile of the skip-time distribution for that
+    puzzle, suggesting they left the page and returned.
+3.  All five puzzles were skipped within 30 to 35 seconds with no answer
+    attempts, indicating the participant waited out the skip-unlock
+    timer on every round rather than engaging with the puzzles.
+
+*AI assistance exclusions*
+
+4.  Self-reported use of AI assistance in the post-session honesty
+    check.
+5.  Hard puzzles solved on the first attempt faster than population
+    benchmarks for that puzzle (any single puzzle below the 5th
+    percentile, or two or more below the 10th), subject to manual
+    review. Flagged participants were retained if their fast solve times
+    were consistent with their relative performance across all rounds,
+    as genuine skill tends to produce proportionally fast times across
+    puzzles rather than selectively fast times on isolated ones.
+
+Attrition, defined as beginning treatment but failing to complete all
+five rounds, accounted for 47 participants. The final analytic sample is
+256 completers across three arms: No Label (n = 87), Easy Label (n =
+80), and Hard Label (n = 89). Figure \@ref(fig:fig-consort) shows the
+full participant flow.
+
+```{r fig-consort, fig.width=9, fig.height=7, fig.cap="Participant flow through the experiment.", fig.pos="H", out.width="\\textwidth"}
+
+raw_json  <- fromJSON("firestore_export.json", simplifyVector = FALSE)
+users_all <- tibble(document_id = names(raw_json$users),
+                    data        = raw_json$users) %>%
+  unnest_wider(data) %>%
+  distinct(userId, .keep_all = TRUE)
+
+new_player_ids <- users_all %>%
+  filter(!is.na(sharedDevice) & sharedDevice == "new_player") %>%
+  pull(userId)
+
+em_u          <- readRDS("experiment_master.rds") %>% distinct(userId, .keep_all = TRUE)
+master_u      <- master %>% distinct(userId, .keep_all = TRUE)
+completed_ids <- master_u %>% filter(sessionComplete == TRUE) %>% pull(userId)
+dropped_ids   <- master_u %>% filter(sessionComplete == FALSE) %>% pull(userId)
+
+arm_src <- master %>%
+  filter(sessionComplete == TRUE) %>%
+  distinct(userId, .keep_all = TRUE) %>%
+  count(treatment, source)
+
+gn <- function(trt, src) {
+  v <- arm_src %>% filter(treatment == trt, source == src) %>% pull(n)
+  if (length(v) == 0) 0L else v
+}
+n_no_org   <- gn("no_label",   "Organic")
+n_no_pro   <- gn("no_label",   "Prolific")
+n_easy_org <- gn("easy_label", "Organic")
+n_easy_pro <- gn("easy_label", "Prolific")
+n_hard_org <- gn("hard_label", "Organic")
+n_hard_pro <- gn("hard_label", "Prolific")
+
+flow <- users_all %>%
+  mutate(
+    exc_replay = case_when(
+      !is.na(sharedDevice) & sharedDevice == "returning" ~ "Returning player",
+      !is.na(isReplay) & isReplay == TRUE & !(userId %in% new_player_ids) ~ "Replay session",
+      TRUE ~ NA_character_
+    ),
+    after_replay = if_else(is.na(exc_replay), userId, NA_character_),
+    exc_no_game = case_when(
+      !is.na(exc_replay) ~ NA_character_,
+      !(userId %in% em_u$userId) ~ "No gamelog records",
+      TRUE ~ NA_character_
+    ),
+    started = if_else(
+      is.na(exc_replay) & (userId %in% em_u$userId), userId, NA_character_
+    ),
+    exc_elig = case_when(
+      !is.na(exc_replay) | !(userId %in% em_u$userId) ~ NA_character_,
+      !is.na(age) & age < 18 ~ "Age < 18",
+      !is.na(prolificRejected) & prolificRejected == TRUE ~ "Prolific rejection",
+      TRUE ~ NA_character_
+    ),
+    eligible = if_else(
+      is.na(exc_replay) & (userId %in% em_u$userId) & is.na(exc_elig),
+      userId, NA_character_
+    ),
+    exc_behav = case_when(
+      !is.na(exc_replay) | !(userId %in% em_u$userId) | !is.na(exc_elig) ~ NA_character_,
+      !(userId %in% master_u$userId) ~ "Behavioral or AI flag",
+      TRUE ~ NA_character_
+    ),
+    quality = if_else(
+      is.na(exc_replay) & (userId %in% em_u$userId) &
+        is.na(exc_elig) & (userId %in% master_u$userId),
+      userId, NA_character_
+    ),
+    exc_att = case_when(
+      !is.na(exc_replay) | !(userId %in% em_u$userId) |
+        !is.na(exc_elig) | !(userId %in% master_u$userId) ~ NA_character_,
+      userId %in% dropped_ids ~ "Did not complete all 5 rounds",
+      TRUE ~ NA_character_
+    ),
+    arm = case_when(
+      !(userId %in% completed_ids) ~ NA_character_,
+      treatment == "no_label" ~
+        paste0("No Label\nOrganic: ", n_no_org, "\nProlific: ", n_no_pro, "\n"),
+      treatment == "easy_label" ~
+        paste0("Easy Label\nOrganic: ", n_easy_org, "\nProlific: ", n_easy_pro, "\n"),
+      treatment == "hard_label" ~
+        paste0("Hard Label\nOrganic: ", n_hard_org, "\nProlific: ", n_hard_pro, "\n")
+    )
+  )
+
+p <- consort_plot(
+  data   = flow,
+  orders = c(
+    userId       = 'Users with a session record',
+    exc_replay   = 'Excluded',
+    after_replay = 'Non-replay participants',
+    exc_no_game  = 'Excluded',
+    started      = 'Participants who started',
+    exc_elig     = 'Excluded',
+    eligible     = 'Eligible participants',
+    exc_behav    = 'Excluded',
+    quality      = 'Passed quality checks',
+    exc_att      = 'Did not complete all 5 rounds',
+    arm          = 'Analyzed'
+  ),
+  side_box   = c('exc_replay', 'exc_no_game', 'exc_elig', 'exc_behav', 'exc_att'),
+  allocation = 'arm',
+  cex        = 0.7
+)
+
+plot(p)
+```
+
+## Potential Outcomes
+
+Each participant has three potential outcomes — how long they would
+spend on the puzzles under each label condition: $Y_i(\text{no label})$,
+$Y_i(\text{easy label})$, and $Y_i(\text{hard label})$. We only ever
+observe one of these per person. Because participants were randomly
+assigned, the treatment someone received is independent of what their
+outcome would have been under a different condition, which means we can
+estimate average outcomes for each arm using the observed group means.
+
+The main comparisons we care about are the treatment effects of each
+label relative to the no-label control, and the direct comparison
+between the two label arms. Each $\tau$ below is the difference in group
+means ($\mu$) between two arms:
+
+$$\tau_{\text{easy}} = \mu_{\text{easy}} - \mu_{\text{no label}} = E[Y_i(\text{easy label})] - E[Y_i(\text{no label})]$$
+
+$$\tau_{\text{hard}} = \mu_{\text{hard}} - \mu_{\text{no label}} = E[Y_i(\text{hard label})] - E[Y_i(\text{no label})]$$
+
+$$\tau_{\text{hard vs. easy}} = \mu_{\text{hard}} - \mu_{\text{easy}} = E[Y_i(\text{hard label})] - E[Y_i(\text{easy label})]$$
+
+The no-label arm is the reference group — participants who saw no
+framing at all. The first two comparisons ask whether giving someone any
+difficulty expectation changes their engagement relative to having none.
+The third asks whether the direction of the label matters: we expect the
+easy and hard labels to push behavior in opposite directions, so
+$\tau_{\text{easy}} < 0$ (frustration leads to less engagement),
+$\tau_{\text{hard}} > 0$ (preparation leads to more), and
+$\tau_{\text{hard vs. easy}} > 0$.
+
+## Randomization and Attrition
+
+### Randomization
+
+Treatment was assigned entirely client-side at the moment a participant
+clicked "I understand -- let's go" on the consent screen. The game
+engine drew a single uniform random variate and mapped it to one of
+three arms with nearly equal probability:
+
+```         
+r = Math.random()
+Treatment = r < 0.333 ? 'no_label'
+          : r < 0.666 ? 'hard_label'
+          : 'easy_label'
+```
+
+`Math.random()` draws a number between 0 and 1 uniformly, with the unit
+interval cut into three equal slices. Each arm was assigned with
+approximately one-third probability. The treatment draw was written to a
+`localStorage` draft immediately after assignment. Participants who
+closed and returned mid-session were shown a "Welcome back" screen that
+restored their original treatment from the draft, ensuring the draw was
+not re-rolled on page reload. A participant's IP address was
+additionally captured and stored under a separate `localStorage` key to
+detect whether a device had previously completed a full session.
+Returning devices were routed to a shared-device screening question
+where participants self-reported whether they were a new or returning
+player. Together, the IP-based flag and the self-report allowed us to
+distinguish true first-time sessions from replays and from new
+participants sharing a household device, retaining only genuine first
+sessions.
+
+### Recruitment Populations
+
+We recruited participants from two different sources, and we track this
+throughout the analysis because recruitment context likely affects both
+dropout and how people engage with the task. Organic participants were
+recruited informally through personal networks — friends, family, and
+word of mouth — with no financial incentive to complete the study.
+Prolific participants were recruited through the Prolific platform,
+which pays participants for completing studies. Prolific workers tend to
+be experienced study participants who are used to following task
+instructions carefully and completing what they start.
+
+### Attrition
+
+Attrition is defined as beginning treatment but failing to complete all
+five rounds. A participant is counted as an attritor if they have a user
+record in the database, created at the moment they click "Start the
+Challenge" and are shown a Round 1 label card, but their session was
+never marked complete. The variable `sessionComplete` is set to TRUE
+only when a participant reaches the results screen after resolving all
+five rounds, each ending in either a correct answer or a skip.
+Participants who passed through the survey and opted out before clicking
+"Start the Challenge" are not counted as attritors because no user
+record is created for them and they were never exposed to the treatment.
+
+#### Differential Attrition in Organic and Prolific Subsamples
+
+The attrition analysis fits logistic regression models predicting
+dropout on treatment arm, estimated separately for the full sample and
+the organic subsample, with no label as the reference arm. The Prolific
+subsample had zero dropout across all arms and is reported descriptively
+only.
+
+```{r tab-attrition}
+user_level <- master %>%
+  distinct(userId, .keep_all = TRUE) %>%
+  mutate(
+    dropped   = as.integer(sessionComplete == FALSE),
+    treatment = relevel(factor(treatment), ref = "no_label")
+  )
+
+m_att_full    <- glm(dropped ~ treatment, data = user_level, family = binomial)
+m_att_organic <- glm(dropped ~ treatment,
+                     data = filter(user_level, source == "Organic"),
+                     family = binomial)
+
+get_or_p <- function(model, term) {
+  if (is.null(model)) return(c(NA, NA))
+  s <- coef(summary(model))
+  if (!term %in% rownames(s)) return(c(NA, NA))
+  c(exp(s[term, "Estimate"]), s[term, "Pr(>|z|)"])
+}
+
+fmt_p <- function(p) {
+  if (is.na(p)) return("---")
+  ifelse(p < .001, "<.001", as.character(round(p, 3)))
+}
+
+or_lookup <- bind_rows(
+  tibble(source = "Organic", treatment = "easy_label",
+         OR = get_or_p(m_att_organic, "treatmenteasy_label")[1],
+         p  = get_or_p(m_att_organic, "treatmenteasy_label")[2]),
+  tibble(source = "Organic", treatment = "hard_label",
+         OR = get_or_p(m_att_organic, "treatmenthard_label")[1],
+         p  = get_or_p(m_att_organic, "treatmenthard_label")[2]),
+  tibble(source = "Prolific", treatment = "easy_label", OR = NA, p = NA),
+  tibble(source = "Prolific", treatment = "hard_label", OR = NA, p = NA),
+  tibble(source = "Full", treatment = "easy_label",
+         OR = get_or_p(m_att_full, "treatmenteasy_label")[1],
+         p  = get_or_p(m_att_full, "treatmenteasy_label")[2]),
+  tibble(source = "Full", treatment = "hard_label",
+         OR = get_or_p(m_att_full, "treatmenthard_label")[1],
+         p  = get_or_p(m_att_full, "treatmenthard_label")[2])
+)
+
+attrition_tbl <- user_level %>%
+  group_by(source, treatment) %>%
+  summarize(
+    n_started     = n(),
+    n_dropped     = sum(dropped),
+    attrition_pct = paste0(round(mean(dropped) * 100, 1), "%"),
+    .groups = "drop"
+  )
+
+get_pct <- function(src, trt) {
+  attrition_tbl %>% filter(source == src, treatment == trt) %>% pull(attrition_pct)
+}
+
+org_no_pct   <- get_pct("Organic", "no_label")
+org_easy_pct <- get_pct("Organic", "easy_label")
+org_hard_pct <- get_pct("Organic", "hard_label")
+org_easy_or  <- round(get_or_p(m_att_organic, "treatmenteasy_label")[1], 3)
+org_easy_p   <- round(get_or_p(m_att_organic, "treatmenteasy_label")[2], 3)
+org_hard_or  <- round(get_or_p(m_att_organic, "treatmenthard_label")[1], 3)
+org_hard_p   <- round(get_or_p(m_att_organic, "treatmenthard_label")[2], 3)
+
+attrition_tbl %>%
+  mutate(treatment = factor(treatment,
+                            levels = c("no_label", "easy_label", "hard_label"),
+                            labels = c("No Label", "Easy Label", "Hard Label"))) %>%
+  left_join(or_lookup %>%
+              mutate(treatment = factor(treatment,
+                                       levels = c("no_label", "easy_label", "hard_label"),
+                                       labels = c("No Label", "Easy Label", "Hard Label"))),
+            by = c("source", "treatment")) %>%
+  mutate(
+    OR = case_when(
+      treatment == "No Label" ~ "ref.",
+      is.na(OR)              ~ "---",
+      TRUE                   ~ as.character(round(OR, 3))
+    ),
+    p = case_when(
+      treatment == "No Label" ~ "---",
+      is.na(p)               ~ "---",
+      TRUE                   ~ sapply(p, fmt_p)
+    )
+  ) %>%
+  arrange(source, treatment) %>%
+  select(-source) %>%
+  rename(
+    Treatment      = treatment,
+    `N Started`    = n_started,
+    `N Dropped`    = n_dropped,
+    `Dropout Rate` = attrition_pct,
+    `Odds Ratio`   = OR,
+    `p-value`      = p
+  ) %>%
+  kable(caption = "Attrition by Treatment Arm and Recruitment Source",
+        booktabs = TRUE,
+        align    = c("l", "c", "c", "c", "c", "c")) %>%
+  kable_styling(latex_options = c("striped", "hold_position"),
+                full_width = FALSE, font_size = 10) %>%
+  pack_rows("Organic",  1, 3) %>%
+  pack_rows("Prolific", 4, 6) %>%
+  footnote(general = "Odds ratios from logistic regression predicting dropout; reference arm: No Label. Prolific model omitted due to zero attrition. Full sample OR uses pooled model.",
+           threeparttable = TRUE)
+```
+
+Among organic participants, dropout rates were `r org_no_pct` in the no
+label arm, `r org_easy_pct` in the easy label arm, and `r org_hard_pct`
+in the hard label arm. The easy label showed no difference from the
+control (OR = `r org_easy_or`, p = `r org_easy_p`). The hard label arm
+had a suggestive but non-significant reduction in dropout relative to no
+label (OR = `r org_hard_or`, p = `r org_hard_p`); notably, the primary
+model found the hard label went in the opposite direction from what we
+expected on engagement time. Dropout rates did not differ significantly
+across arms, so we did not find evidence that differential attrition
+meaningfully biased the primary outcome estimates. If the pattern were
+real, the no label arm losing more participants would leave its
+completers as a more selected group, which would compress the estimated
+differences between arms. The Prolific subsample had zero dropout across
+all three arms, which was expected given that Prolific participants are
+paid to complete studies (see Table \@ref(tab:tab-attrition)).
+
+## Completer Analysis & Covariate Balance
+
+The primary analysis estimates average treatment effects among the 256
+participants who completed all five rounds. Restricting to completers
+introduces potential attrition bias if dropout is related to treatment.
+As noted above, organic dropout was suggestively lower in the hard label
+arm, though not statistically significant. If that pattern reflects a
+real effect, the no label arm would lose a disproportionately higher
+share of participants, leaving its completers as a more select group and
+compressing estimated treatment effect differences toward zero.
+
+```{r tab-balance}
+bal <- df %>%
+  distinct(userId, .keep_all = TRUE) %>%
+  mutate(
+    treatment   = relevel(factor(treatment), ref = "no_label"),
+    is_prolific = as.integer(source == "Prolific"),
+    is_desktop  = as.integer(deviceType == "Desktop"),
+    is_female   = as.integer(gender == "Female")
+  )
+
+models <- list(
+  "Age"            = lm(age                  ~ treatment, data = bal),
+  "Quant Exp"      = lm(quantitativeExposure ~ treatment, data = bal),
+  "Puzzle Skill"   = lm(puzzleSkill          ~ treatment, data = bal),
+  "Puzzle Enjoy"   = lm(puzzleEnjoyment      ~ treatment, data = bal),
+  "Energy"         = lm(energyLevel          ~ treatment, data = bal),
+  "Recruit Source" = lm(is_prolific          ~ treatment, data = bal),
+  "Desktop"        = lm(is_desktop           ~ treatment, data = bal),
+  "Female"         = lm(is_female            ~ treatment, data = bal)
+)
+
+modelsummary(
+  models,
+  coef_map  = c("treatmenteasy_label" = "Easy Label",
+                "treatmenthard_label" = "Hard Label"),
+  stars     = c("*" = 0.05, "**" = 0.01, "***" = 0.001),
+  gof_omit  = ".*",
+  title     = "Covariate Balance Across Treatment Arms",
+  notes     = "OLS coefficients vs. no-label reference arm. SEs in parentheses.",
+  booktabs  = TRUE,
+  output    = "kableExtra"
+) %>%
+  kable_styling(latex_options = c("hold_position", "scale_down"), font_size = 9)
+```
+
+Table \@ref(tab:tab-balance) presents covariate balance across the three
+treatment arms among completers. Each column reports an OLS regression
+of one baseline characteristic on treatment indicators, with no label as
+the reference arm. None of the easy label or hard label coefficients
+reach conventional significance thresholds on any covariate: age,
+quantitative exposure, puzzle skill, puzzle enjoyment, energy level,
+recruitment source, device type, or gender. The $R^2$ values are near
+zero throughout, confirming that treatment assignment explains
+essentially none of the variance in any baseline variable. This balance
+supports the validity of the completer analysis: observed differences in
+outcomes across arms are unlikely to reflect pre-existing differences in
+participant composition.
+
+## Results
+
+### Behavioral Differences by Recruitment Source
+
+To assess whether recruitment source introduced systematic differences
+in data quality or engagement patterns, we examined four behavioral
+indicators across Prolific and organic participants: across-person
+variability in log time engaged, within-person variability in log time
+engaged, tab switch frequency, and total time spent with the browser tab
+inactive.
+
+```{r tab-within-sd, results="asis", message=FALSE, warning=FALSE}
+person_engage <- df %>%
+  group_by(userId, source) %>%
+  summarize(mean_logTE   = mean(logTE, na.rm = TRUE),
+            sd_logTE     = sd(logTE, na.rm = TRUE),
+            total_tabs   = sum(tabSwitchCount, na.rm = TRUE),
+            total_paused = sum(tabSwitchTimePaused, na.rm = TRUE),
+            .groups = "drop") %>%
+  group_by(source) %>%
+  mutate(across_sd = abs(mean_logTE - mean(mean_logTE))) %>%
+  ungroup()
+
+m_across    <- lm(across_sd    ~ source, data = person_engage)
+m_within_sd <- lm(sd_logTE     ~ source, data = person_engage)
+m_tabs      <- lm(total_tabs   ~ source, data = person_engage)
+m_paused    <- lm(total_paused ~ source, data = person_engage)
+
+stargazer(m_across, m_within_sd, m_tabs, m_paused,
+          type             = "latex",
+          title            = "Behavioral Differences by Recruitment Source",
+          dep.var.labels   = c("Across-Person SD", "Within-Person SD", "Tab Switches", "Time Paused (s)"),
+          covariate.labels = "Prolific (vs. Organic)",
+          omit.stat        = c("f", "ser"),
+          header           = FALSE,
+          table.placement  = "H")
+```
+
+Across the four indicators, two differences emerge. Across-person
+variability in log time engaged does not differ significantly between
+groups, suggesting that the two subsamples are comparable in their
+overall engagement levels. Within-person variability, however, is
+significantly higher among organic participants: organic participants
+were more erratic across their five puzzle rounds than Prolific
+participants. One plausible explanation is that organic participants,
+recruited informally through personal networks, varied more in their
+environment, distraction level, and motivation from one puzzle to the
+next. A participant might have been fully focused on one round and
+interrupted on another.
+
+Organic participants also spent significantly more total time with the
+browser tab inactive, which points to more real-world interruptions
+during the session. Tab switch counts did not differ significantly
+between groups. Prolific participants likely kept more consistent
+conditions throughout, given the platform's completion norms. Either
+way, higher within-person variability among organic participants
+increases the residual variance in the model, which means wider
+confidence intervals and less power to detect a treatment effect. So the
+null result doesn't necessarily mean there's no effect — it may just
+mean we didn't have enough precision to detect a small one.
+
+### Primary Model: Effect of Difficulty Labels on Log Time Engaged
+
+#### Outcome Distribution
+
+Raw time engaged is strongly right-skewed, with a long tail from
+participants who spent disproportionately long on a single puzzle. Log
+transformation is applied to reduce skew and stabilize variance before
+modeling.
+
+```{r fig-log-justification, fig.width=8, fig.height=3.5, fig.cap="Distribution of time engaged before and after log transformation.", fig.pos="H", out.width="\\textwidth"}
+m1_raw <- ggplot(df, aes(x = timeEngaged)) +
+  geom_histogram(bins = 40, fill = "steelblue", color = "white") +
+  labs(x = "Time Engaged (seconds)", y = "Count", title = "Raw")
+
+m1_log <- ggplot(df, aes(x = logTE)) +
+  geom_histogram(bins = 40, fill = "steelblue", color = "white") +
+  labs(x = "Log Time Engaged", y = "Count", title = "Log-Transformed")
+
+m1_raw + m1_log
+```
+
+As shown in Figure \@ref(fig:fig-log-justification), the log
+transformation substantially reduces skew and produces an approximately
+symmetric distribution.
+
+#### Model Specification
+
+We estimated the effect of difficulty labels on log time engaged using a
+linear mixed-effects model with puzzle fixed effects, a
+participant-level random intercept, and pre-treatment covariates:
+
+$$\log(\text{TimeEngaged}_{it}) = \beta_0 + \beta_1 \text{EasyLabel}_i + \beta_2 \text{HardLabel}_i + \mathbf{X}_i'\boldsymbol{\delta} + \varepsilon_{it}$$
+
+where $\mathbf{X}_i$ includes puzzle skill, recruitment source, age,
+quantitative exposure, energy level, and device type. Standard errors
+are clustered at the participant level using CR1 with Satterthwaite
+degrees of freedom.
+
+```{r primary-model, message=FALSE, warning=FALSE}
+# Full sample (controls for source)
+m      <- lmer(logTE ~ treatment + puzzleId + puzzleSkill + source +
+                 age + quantitativeExposure + energyLevel + deviceType + (1 | userId),
+               data = df, REML = FALSE)
+vcov_m <- vcovCR(m, cluster = df$userId, type = "CR1")
+rt     <- coef_test(m, vcov = vcov_m, test = "Satterthwaite")
+
+# Organic subsample
+m_org    <- lmer(logTE ~ treatment + puzzleId + puzzleSkill +
+                   age + quantitativeExposure + energyLevel + deviceType + (1 | userId),
+                 data = df_organic, REML = FALSE)
+vcov_org <- vcovCR(m_org, cluster = df_organic$userId, type = "CR1")
+rt_org   <- coef_test(m_org, vcov = vcov_org, test = "Satterthwaite")
+
+# Prolific subsample
+m_pro    <- lmer(logTE ~ treatment + puzzleId + puzzleSkill +
+                   age + quantitativeExposure + energyLevel + deviceType + (1 | userId),
+                 data = df_prolific, REML = FALSE)
+vcov_pro <- vcovCR(m_pro, cluster = df_prolific$userId, type = "CR1")
+rt_pro   <- coef_test(m_pro, vcov = vcov_pro, test = "Satterthwaite")
+
+modelsummary(
+  list("Full" = m, "Organic" = m_org, "Prolific" = m_pro),
+  vcov      = list(vcov_m, vcov_org, vcov_pro),
+  statistic = c("({std.error})", "p = {p.value}"),
+  coef_map  = c("treatmenteasy_label" = "Easy Label",
+                "treatmenthard_label" = "Hard Label"),
+  gof_omit  = ".*",
+  stars     = c("*" = 0.1, "**" = 0.05, "***" = 0.01),
+  title     = "Effect of Difficulty Labels on Log Time Engaged",
+  booktabs  = TRUE,
+  output    = "kableExtra"
+) %>%
+  kable_styling(latex_options = c("hold_position", "scale_down"), font_size = 9) %>%
+  footnote(general = "Mixed-effects model (lmer); cluster-robust SEs (CR1) by participant.",
+           threeparttable = TRUE)
+```
+
+```{r m1-vals, include=FALSE}
+m1_easy_b  <- round(rt$beta[rt$Coef == "treatmenteasy_label"], 3)
+m1_easy_se <- round(rt$SE[rt$Coef == "treatmenteasy_label"], 3)
+m1_easy_p  <- round(rt$p_Satt[rt$Coef == "treatmenteasy_label"], 3)
+m1_hard_b  <- round(rt$beta[rt$Coef == "treatmenthard_label"], 3)
+m1_hard_se <- round(rt$SE[rt$Coef == "treatmenthard_label"], 3)
+m1_hard_p  <- round(rt$p_Satt[rt$Coef == "treatmenthard_label"], 3)
+m1_hard_pct   <- round((1 - exp(rt$beta[rt$Coef == "treatmenthard_label"])) * 100, 1)
+m1_hard_org_b <- round(rt_org$beta[rt_org$Coef == "treatmenthard_label"], 3)
+m1_hard_pro_b <- round(rt_pro$beta[rt_pro$Coef == "treatmenthard_label"], 3)
+```
+
+Neither label had a statistically significant effect on log time engaged
+relative to the no-label control in the full sample (Table
+\@ref(tab:primary-model)). The easy label estimate is near zero overall
+($\hat{\beta}_{\text{easy}}$ = `r m1_easy_b`, SE = `r m1_easy_se`, p =
+`r m1_easy_p`), but this masks opposing effects across subgroups:
+organic participants show a negative estimate consistent with H2, while
+Prolific participants show a slight positive — the two cancel out in the
+pooled sample. The hard label is consistently negative across both
+subgroups (organic: `r m1_hard_org_b`, Prolific: `r m1_hard_pro_b`), and
+the pooled estimate ($\hat{\beta}_{\text{hard}}$ = `r m1_hard_b`, SE =
+`r m1_hard_se`, p = `r m1_hard_p`) is marginally significant at the 10%
+level, corresponding to about `r m1_hard_pct`% less time engaged — the
+opposite direction from H1, which predicted the hard label would
+increase persistence.
+
+This marginal result should be interpreted cautiously for two reasons.
+First, across the primary and secondary models we ran multiple
+comparisons — two treatment coefficients across three samples and two
+outcomes — and we did not pre-register a correction procedure. Applying
+a Bonferroni adjustment to the family of tests run here would push the
+threshold well below the conventional 0.05 level, leaving no result
+significant. Second, our power analysis targeted 120 participants per
+arm to achieve 80% power, but we ended up with roughly 85 per arm among
+completers. At that sample size the simulation suggests power closer to
+65%, meaning we likely lack the precision to reliably detect effects of
+the size we hypothesized, let alone smaller ones.
+
+```{r fig-coef, fig.width=5, fig.height=2.5, fig.pos="H", fig.align="center", out.width="0.65\\textwidth", fig.cap="Point estimates and 95\\% confidence intervals for the effect of difficulty labels on log time engaged relative to the no label control. Error bars are based on cluster-robust standard errors."}
+coef_df <- data.frame(
+  term = c("Easy Label", "Hard Label"),
+  est  = c(rt$beta[rt$Coef == "treatmenteasy_label"],
+           rt$beta[rt$Coef == "treatmenthard_label"]),
+  se   = c(rt$SE[rt$Coef == "treatmenteasy_label"],
+           rt$SE[rt$Coef == "treatmenthard_label"])
+) %>%
+  mutate(lo = est - 1.96 * se, hi = est + 1.96 * se)
+
+ggplot(coef_df, aes(x = est, y = term)) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "gray50") +
+  geom_errorbar(aes(xmin = lo, xmax = hi), width = 0.15) +
+  geom_point(size = 3) +
+  labs(x = "Estimated Effect on Log Time Engaged", y = NULL,
+       title    = "Effect of Difficulty Labels on Engagement",
+       subtitle = "Relative to no-label control; error bars are 95% CIs") +
+  theme_bw(base_size = 9)
+```
+
+As shown in Figure \@ref(fig:fig-coef), the confidence intervals for
+both estimates are wide and cross zero, so we can't say much about the
+true direction of either effect. H3 is also not supported — the hard
+label point estimate is actually below the easy label estimate, the
+opposite of what we predicted.
+
+### Secondary Model: Effect of Difficulty Labels on Zero-Attempt Skips
+
+#### Outcome Description
+
+The secondary outcome is zero-attempt skips — rounds where a participant
+skipped without entering any response, regardless of how much time or
+cognitive effort preceded that decision.
+
+```{r tab-skip-rate}
+skip_by_puzzle <- df %>%
+  mutate(puzzle = case_when(
+    puzzleId == "puzzle_01" ~ "Number Sequence",
+    puzzleId == "puzzle_02" ~ "Alphabet Wheel",
+    puzzleId == "puzzle_03" ~ "Shape Sequence",
+    puzzleId == "puzzle_04" ~ "Hybrid Puzzle",
+    puzzleId == "puzzle_05" ~ "Tile Sequence"
+  )) %>%
+  group_by(puzzle, treatment) %>%
+  summarize(rate = mean(zero_att_skip, na.rm = TRUE), .groups = "drop") %>%
+  pivot_wider(names_from = treatment, values_from = rate) %>%
+  rename("No Label" = no_label, "Easy Label" = easy_label, "Hard Label" = hard_label)
+
+overall <- df %>%
+  group_by(treatment) %>%
+  summarize(rate = mean(zero_att_skip, na.rm = TRUE), .groups = "drop") %>%
+  pivot_wider(names_from = treatment, values_from = rate) %>%
+  rename("No Label" = no_label, "Easy Label" = easy_label, "Hard Label" = hard_label) %>%
+  mutate(puzzle = "Overall")
+
+bind_rows(skip_by_puzzle, overall) %>%
+  mutate(across(where(is.numeric), ~ paste0(round(. * 100, 1), "%"))) %>%
+  rename(Puzzle = puzzle) %>%
+  kable(booktabs = TRUE, align = c("l", "c", "c", "c"),
+        caption = "Zero-attempt skip rate by puzzle and treatment arm.") %>%
+  kable_styling(latex_options = c("hold_position"), font_size = 10) %>%
+  row_spec(nrow(skip_by_puzzle) + 1, bold = TRUE)
+```
+
+#### Model Specification
+
+We model zero-attempt skips using a Linear Probability Model (LPM),
+estimating the probability of a zero-attempt skip as a linear function
+of treatment assignment and covariates:
+
+$$\text{ZeroAttSkip}_{it} = \beta_0 + \beta_1 \text{EasyLabel}_i + \beta_2 \text{HardLabel}_i + \mathbf{X}_i'\boldsymbol{\delta} + \varepsilon_{it}$$
+
+where $\mathbf{X}_i$ includes puzzle skill, age, quantitative exposure,
+energy level, and device type. The full-sample model additionally
+controls for recruitment source. Standard errors are clustered by
+participant (CR1, Satterthwaite degrees of freedom), and coefficients
+are interpreted as percentage-point differences in zero-attempt skip
+probability relative to the no-label control.
+
+Zero-attempt skips are heavily concentrated in two puzzles. As shown in
+Table \@ref(tab:tab-skip-rate), Number Sequence and Tile Sequence
+account for the vast majority of cold skips, with overall rates of 23%
+and 20% respectively, while Shape Sequence and Hybrid Puzzle see
+virtually none. Alphabet Wheel falls in between at around 10%. The easy
+label arm consistently shows lower skip rates across puzzles, while hard
+label is slightly elevated relative to no label — a pattern that holds
+across puzzle types rather than being driven by any single puzzle.
+
+```{r zero-att-model, include=FALSE}
+fit_zas <- function(data, control_source = FALSE) {
+  fmla <- if (control_source)
+    zero_att_skip ~ treatment + puzzleId + puzzleSkill + source +
+      age + quantitativeExposure + energyLevel + deviceType
+  else
+    zero_att_skip ~ treatment + puzzleId + puzzleSkill +
+      age + quantitativeExposure + energyLevel + deviceType
+  m  <- lm(fmla, data = data)
+  vc <- vcovCR(m, cluster = data$userId, type = "CR1")
+  rt <- coef_test(m, vcov = vc, test = "Satterthwaite")
+  list(m = m, se = sqrt(diag(vc)), p = rt$p_Satt, rt = rt)
+}
+
+za_full <- fit_zas(df, control_source = TRUE)
+za_org  <- fit_zas(df_organic)
+za_pro  <- fit_zas(df_prolific)
+```
+
+```{r tab-zas, results="asis", message=FALSE, warning=FALSE}
+stargazer(za_full$m, za_org$m, za_pro$m,
+          se               = list(za_full$se, za_org$se, za_pro$se),
+          p                = list(za_full$p,  za_org$p,  za_pro$p),
+          type             = "latex",
+          title            = "Effect of Difficulty Labels on Zero-Attempt Skips",
+          dep.var.caption  = "",
+          dep.var.labels   = c("Full", "Organic", "Prolific"),
+          multicolumn      = FALSE,
+          covariate.labels = c("Easy Label", "Hard Label"),
+          keep             = c("treatmenteasy_label", "treatmenthard_label"),
+          report           = "vc*sp",
+          omit.stat        = c("f", "ser"),
+          label            = "tab:tab-zas",
+          header           = FALSE,
+          table.placement  = "H",
+          font.size        = "small",
+          notes            = "LPM; cluster-robust SEs (CR1) by participant.")
+```
+
+```{r zas-vals, include=FALSE}
+easy_full_pp <- round(abs(za_full$rt$beta[za_full$rt$Coef == "treatmenteasy_label"]) * 100, 1)
+easy_full_p  <- round(za_full$rt$p_Satt[za_full$rt$Coef == "treatmenteasy_label"], 3)
+hard_full_b  <- round(za_full$rt$beta[za_full$rt$Coef == "treatmenthard_label"], 3)
+hard_full_p  <- round(za_full$rt$p_Satt[za_full$rt$Coef == "treatmenthard_label"], 3)
+easy_pro_pp  <- round(abs(za_pro$rt$beta[za_pro$rt$Coef == "treatmenteasy_label"]) * 100, 1)
+easy_pro_p   <- round(za_pro$rt$p_Satt[za_pro$rt$Coef == "treatmenteasy_label"], 3)
+easy_org_b   <- round(za_org$rt$beta[za_org$rt$Coef == "treatmenteasy_label"], 3)
+easy_org_p   <- round(za_org$rt$p_Satt[za_org$rt$Coef == "treatmenteasy_label"], 3)
+```
+
+The linear model estimates the effect of difficulty labels on the
+probability of skipping a puzzle without any answer attempt (Table
+\@ref(tab:tab-zas)). The hard label shows no meaningful effect no matter
+how we slice the sample — the coefficient is near zero and
+non-significant in the full sample ($\hat{\beta}_{\text{hard}}$ =
+`r hard_full_b`, p = `r hard_full_p`), among organic participants, and
+among Prolific participants.
+
+The easy label effect on zero-attempt skips is driven entirely by
+Prolific participants. Among Prolific participants, the easy label
+reduces the zero-attempt skip rate by `r easy_pro_pp` percentage points
+(p = `r easy_pro_p`), while among organic participants the effect is
+small and non-significant ($\hat{\beta}_{\text{easy}}$ = `r easy_org_b`,
+p = `r easy_org_p`). When the two groups are pooled and recruitment
+source is controlled for, the organic null attenuates the Prolific
+signal, yielding a marginally significant estimate of `r easy_full_pp`
+percentage points (p = `r easy_full_p`) in the full sample.
+
+```{r fig-skip-coef, fig.width=5, fig.height=2.5, fig.pos="H", fig.align="center", fig.cap="Estimated effect of difficulty labels on zero-attempt skip probability (linear probability model). Coefficients represent percentage-point change relative to the no-label control. Error bars are 95\\% CIs based on cluster-robust SEs.", out.width="0.65\\textwidth"}
+rt_zas <- za_full$rt
+coef_df <- data.frame(
+  term = c("Easy Label", "Hard Label"),
+  est  = c(rt_zas$beta[rt_zas$Coef == "treatmenteasy_label"],
+           rt_zas$beta[rt_zas$Coef == "treatmenthard_label"]),
+  se   = c(rt_zas$SE[rt_zas$Coef == "treatmenteasy_label"],
+           rt_zas$SE[rt_zas$Coef == "treatmenthard_label"])
+) %>% mutate(lo = est - 1.96 * se, hi = est + 1.96 * se)
+
+ggplot(coef_df, aes(x = est, y = term)) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "gray50") +
+  geom_errorbar(aes(xmin = lo, xmax = hi), width = 0.15) +
+  geom_point(size = 3) +
+  labs(x = "Effect on Zero-Attempt Skip Rate (pp)", y = NULL,
+       title    = "Effect of Difficulty Labels on Zero-Attempt Skips",
+       subtitle = "Relative to no-label control; error bars are 95% CIs") +
+  theme_bw(base_size = 9)
+```
+
+As shown in Figure \@ref(fig:fig-skip-coef), the easy label coefficient
+is negative and pointing toward fewer cold skips relative to no label.
+However, the confidence interval is wide and crosses zero in the full
+sample. The hard label estimate is close to zero with a wide interval in
+both directions, so there's no real signal there.
+
+The difference in the easy label's effect between Prolific and organic
+participants likely reflects differences in how each group engages with
+task framing. Prolific participants are experienced study participants
+who tend to read instructions carefully and take task cues seriously —
+when told a puzzle is easy, they internalize that label and may feel a
+stronger obligation to at least attempt an answer before skipping.
+Organic participants, recruited informally through personal networks,
+tend to be more distracted and less attentive to framing; we also found
+they spent significantly more time with the browser tab inactive,
+suggesting more real-world interruptions that could override any label
+effect. In short, the easy label appears to work by making cold-skipping
+feel less acceptable, but that mechanism requires the participant to be
+paying attention to the framing in the first place.
+
+
+### Secondary Model: Effect of Difficulty Labels on Time Before Skipping
+
+#### Outcome Description
+#### Model Specification
+
+Similar to the primary model, we estimated the effect of difficulty labels on log time engaged before skipping. This is a linear mixed-effects model with puzzle fixed effects, a participant-level random intercept, and pre-treatment covariates:
+
+$$\log(\text{TimeEngagedBeforeSkip}_{it}) = \beta_0 + \beta_1 \text{EasyLabel}_i + \beta_2 \text{HardLabel}_i + \mathbf{X}_i'\boldsymbol{\delta} + \varepsilon_{it}$$
+
+```{r prepare-skip-robustness, include=FALSE}
+
+prepare_skip_sample <- function(data) {
+  data %>%
+    filter(didSkip == TRUE) %>%
+    drop_na(
+      timeEngaged,
+      treatment,
+      puzzleId,
+      puzzleSkill,
+      age,
+      quantitativeExposure,
+      energyLevel,
+      deviceType,
+      userId
+    ) %>%
+    mutate(
+      treatment = relevel(
+        factor(treatment),
+        ref = "no_label"
+      ),
+      puzzleId = relevel(
+        factor(puzzleId),
+        ref = "puzzle_01"
+      ),
+      logTE = log(timeEngaged + 1)
+    )
+}
+
+skip_full <- prepare_skip_sample(df) %>%
+  drop_na(source)
+
+skip_org <- prepare_skip_sample(df_organic)
+
+skip_pro <- prepare_skip_sample(df_prolific)
+
+```
+
+```{r, include=FALSE}
+tibble(
+  Sample = c("Full", "Organic", "Prolific"),
+  `Skipped Rounds` = c(
+    nrow(skip_full),
+    nrow(skip_org),
+    nrow(skip_pro)
+  ),
+  Participants = c(
+    n_distinct(skip_full$userId),
+    n_distinct(skip_org$userId),
+    n_distinct(skip_pro$userId)
+  )
+)
+```
+
+
+
+```{r fit-skip-robustness, include=FALSE}
+
+
+fit_skip_source <- function(data, control_source = FALSE) {
+
+  fmla <- if (control_source) {
+    logTE ~ treatment + puzzleId + puzzleSkill + source +
+      age + quantitativeExposure + energyLevel + deviceType +
+      (1 | userId)
+  } else {
+    logTE ~ treatment + puzzleId + puzzleSkill +
+      age + quantitativeExposure + energyLevel + deviceType +
+      (1 | userId)
+  }
+
+  m <- lmer(
+    fmla,
+    data = data,
+    REML = FALSE
+  )
+
+  vc <- vcovCR(
+    m,
+    cluster = data$userId,
+    type = "CR1"
+  )
+
+  rt <- coef_test(
+    m,
+    vcov = vc,
+    test = "Satterthwaite"
+  )
+
+  list(
+    m = m,
+    se = sqrt(diag(vc)),
+    p = rt$p_Satt,
+    rt = rt
+  )
+}
+
+skip_fit_full <- fit_skip_source(
+  skip_full,
+  control_source = TRUE
+)
+
+skip_fit_org <- fit_skip_source(skip_org)
+
+skip_fit_pro <- fit_skip_source(skip_pro)
+
+```
+
+
+
+```{r tab-skip-source-final, results="asis", message=FALSE, warning=FALSE}
+stargazer(
+  skip_fit_full$m,
+  skip_fit_org$m,
+  skip_fit_pro$m,
+  se               = list(
+    skip_fit_full$se,
+    skip_fit_org$se,
+    skip_fit_pro$se
+  ),
+  p                = list(
+    skip_fit_full$p,
+    skip_fit_org$p,
+    skip_fit_pro$p
+  ),
+  type             = "latex",
+  title            = "Effect of Difficulty Labels on Time Before Skipping",
+  dep.var.caption  = "",
+  dep.var.labels   = c("Full", "Organic", "Prolific"),
+  multicolumn      = FALSE,
+  covariate.labels = c("Easy Label", "Hard Label"),
+  keep             = c(
+    "treatmenteasy_label",
+    "treatmenthard_label"
+  ),
+  report           = "vc*sp",
+  omit.stat        = c("f", "ser", "ll", "aic", "bic"),
+  label            = "tab:tab-skip-source",
+  header           = FALSE,
+  table.placement  = "H",
+  font.size        = "small",
+  notes            = "Mixed-effects models; CR1 cluster-robust SEs by participant."
+)
+```
+
+
+
+
+## Appendix
+
+### A. Residual Diagnostics
+
+```{r fig-qq, fig.width=5, fig.height=5, fig.pos="H", fig.cap="Normal Q-Q plot of residuals from the primary model (log time engaged ~ difficulty label + puzzle fixed effects + covariates + participant random intercept). Residuals track the reference line closely across the central range, with minor deviation in the lower tail, consistent with a light left tail after log transformation."}
+qqnorm(residuals(m), main = "Normal Q-Q Plot of Model Residuals")
+qqline(residuals(m), col = "steelblue")
+```
