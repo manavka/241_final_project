@@ -25,6 +25,7 @@ library(dplyr)
 library(tidyr)
 library(purrr)
 library(lme4)
+library(sandwich)
 library(clubSandwich)
 library(knitr)
 library(kableExtra)
@@ -34,7 +35,9 @@ library(consort)
 library(ggplot2)
 library(patchwork)
 library(stargazer)
-
+library(MASS)
+library(lmtest)
+library(margins)
 master      <- readRDS("analysis_data.rds")
 df          <- master %>% filter(sessionComplete == TRUE)
 df_prolific <- df %>% filter(source == "Prolific")
@@ -1130,13 +1133,16 @@ effect. In short, the easy label appears to work by making cold-skipping
 feel less acceptable, but that mechanism requires the participant to be
 paying attention to the framing in the first place.
 
-
 ### Secondary Model: Effect of Difficulty Labels on Time Before Skipping
 
 #### Outcome Description
+
 #### Model Specification
 
-Similar to the primary model, we estimated the effect of difficulty labels on log time engaged before skipping. This is a linear mixed-effects model with puzzle fixed effects, a participant-level random intercept, and pre-treatment covariates:
+Similar to the primary model, we estimated the effect of difficulty
+labels on log time engaged before skipping. This is a linear
+mixed-effects model with puzzle fixed effects, a participant-level
+random intercept, and pre-treatment covariates:
 
 $$\log(\text{TimeEngagedBeforeSkip}_{it}) = \beta_0 + \beta_1 \text{EasyLabel}_i + \beta_2 \text{HardLabel}_i + \mathbf{X}_i'\boldsymbol{\delta} + \varepsilon_{it}$$
 
@@ -1194,8 +1200,6 @@ tibble(
 )
 ```
 
-
-
 ```{r fit-skip-robustness, include=FALSE}
 
 
@@ -1248,8 +1252,6 @@ skip_fit_pro <- fit_skip_source(skip_pro)
 
 ```
 
-
-
 ```{r tab-skip-source-final, results="asis", message=FALSE, warning=FALSE}
 stargazer(
   skip_fit_full$m,
@@ -1285,10 +1287,259 @@ stargazer(
 )
 ```
 
+## Secondary Model: Effect of Difficulty Labels on Attempt Count
+
+#### Outcome Distribution
+
+```{r fig-log-justification-ATT-COUNT, fig.width=8, fig.height=3.5, fig.cap="Distribution of Attempt Count Before and After Log Transformation.", fig.pos="H", out.width="\\textwidth"}
+m1_raw <- ggplot(df, aes(x = attemptCount)) +
+  geom_histogram(bins = 20, fill = "steelblue", color = "white") +
+  labs(x = "Attempt Count", y = "Count", title = "Attempt Count Distribution")
+m1_raw
+
+summary(df$attemptCount)
+mean_att<-mean(df$attemptCount)
+var_att<-var(df$attemptCount)
+num_zero_att<-sum((df$attemptCount)==0)
+num_responses_att<-length(df$attemptCount)
+prop_of_zero<-num_zero_att/num_responses_att
+
+```
+
+Attempt count records the number of attempts made on a question before
+getting the correct answer of skipping. Raw attempt count is strongly
+right-skewed, with a sparse tail from the few participants who made many
+attempts on a single puzzle. This is a count variable that only takes
+integer values. This suggests that a traditional linear model is not
+appropriate.
+
+#### Model Specification
+
+Since our outcome variable, attempt count, is an integer count,
+traditional linear models are not appropriate. The variance is much
+larger of our than the mean, (`r var_att`\>\>`r mean_at`), and there is
+no zero inflation, (proportion of zeroes is `r prop_of_zero`). Given
+these facts, negative Binomial regression is most suited for this task.
+It is not mathematically possible to use a negative binomial regression
+model and with cluster robust SEs and a participant level random
+baseline. If we include userId as a factor, the model estimates a
+separate intercept for each user (factor(userId)) plus a treatment
+effect that is constant within each user we elected to use participant
+as a factor so we can still use clustered robust SE Since treatment is
+perfectly determined by user (each user has only one treatment), the
+model is effectively trying to estimate one dummy per user plus a dummy
+for treatment that is just a relabeling of users which leads to
+perfect/near-perfect collinearity. This means the treatment effect will
+not be correctly identified. This leads us to drop the userId covariate
+entirely. We estimated the effect of difficulty labels on log time
+engaged using a negative binomial model with puzzle fixed effects and
+pre-treatment covariates:
+
+$$
+E[\text{attemptCount}_i] =
+\exp\!\Big(
+  \beta_0
+  + \beta_1\,\text{treatment}_i
+  + \beta_2\,\text{puzzleId}_i
+  + \beta_3\,\text{puzzleSkill}_i
+  + \beta_4\,\text{source}_i
+  + \beta_5\,\text{age}_i
+  + \beta_6\,\text{quantitativeExposure}_i
+  + \beta_7\,\text{energyLevel}_i
+  + \beta_8\,\text{deviceType}_i
+\Big)
+$$
+
+```{r attcount-model, message=FALSE, warning=FALSE}
+
+# Full sample (controls for source)
+m_nb <- glm.nb(
+  attemptCount ~ treatment + puzzleId + puzzleSkill + source +
+            age + quantitativeExposure + energyLevel + deviceType,
+  data = df
+)
+
+vcov_m <- vcovCL(m_nb, cluster = df$userId)
+rt<-coeftest(m_nb, vcov = vcov_m)
 
 
 
-## Appendix
+
+
+# Organic subsample
+m_org <- glm.nb(
+  attemptCount ~ treatment + puzzleId + puzzleSkill  +
+            age + quantitativeExposure + energyLevel + deviceType,
+  data = df_organic
+)
+
+vcov_org <- vcovCL(m_org, cluster = df_organic$userId)
+rt_org<-coeftest(m_org, vcov = vcov_org)
+
+
+# Prolific subsample
+m_pro <- glm.nb(
+  attemptCount ~ treatment + puzzleId + puzzleSkill  +
+            age + quantitativeExposure + energyLevel + deviceType,
+  data = df_prolific
+)
+
+vcov_pro <- vcovCL(m_pro, cluster = df_prolific$userId)
+rt_pro<-coeftest(m_pro, vcov = vcov_pro)
+
+modelsummary(
+  list("Full" = m_nb, "Organic" = m_org, "Prolific" = m_pro),
+  vcov      = list(vcov_m, vcov_org, vcov_pro),
+  statistic = c("({std.error})", "p = {p.value}"),
+  coef_map  = c("treatmenteasy_label" = "Easy Label",
+                "treatmenthard_label" = "Hard Label",
+                "puzzleIdpuzzle_02" = "Puzzle 2",
+                "puzzleIdpuzzle_03" = "Puzzle 3",
+                "puzzleIdpuzzle_04" = "Puzzle 4",
+                "puzzleIdpuzzle_05" = "Puzzle 5"),
+  gof_omit  = ".*",
+  stars     = c("*" = 0.1, "**" = 0.05, "***" = 0.01),
+  title     = "Effect of Difficulty Labels on Attempt Count",
+  booktabs  = TRUE,
+  output    = "kableExtra"
+) %>%
+  kable_styling(latex_options = c("hold_position", "scale_down"), font_size = 9) %>%
+  footnote(general = "negative binomial model; cluster-robust SEs (CR1) by participant.",
+           threeparttable = TRUE)
+```
+
+```{r attcount-vals, include=FALSE}
+exp(.08)
+rt_pro
+rt_pro[40]
+m1_easy_b  <- round(rt[2], 3)
+m1_easy_se <- round(rt[15], 3)
+m1_easy_p  <- round(rt[41], 3)
+m1_hard_b  <- round(rt[3], 3)
+m1_hard_se <- round(rt[16], 3)
+m1_hard_p  <- round(rt[42], 3)
+
+m1_puz2_b_full  <- round(rt[4], 3)
+m1_puz2_se_full <- round(rt[17], 3)
+m1_puz2_p_full  <- round(rt[43], 3)
+
+m1_puz2_b_org  <- round(rt_org[4], 3)
+m1_puz2_se_org <- round(rt_org[16], 3)
+m1_puz2_p_org  <- round(rt_org[40], 3)
+
+m1_puz2_b_pro  <- round(rt_pro[4], 3)
+m1_puz2_se_pro<- round(rt_pro[16], 3)
+m1_puz2_p_pro  <- round(rt_pro[40], 3)
+
+m1_puz3_b_full  <- round(rt[5], 3)
+m1_puz3_se_full <- round(rt[18], 3)
+m1_puz3_p_full  <- round(rt[44], 3)
+
+m1_puz3_b_org  <- round(rt_org[5], 3)
+m1_puz3_se_org <- round(rt_org[17], 3)
+m1_puz3_p_org  <- round(rt_org[41], 3)
+
+m1_puz3_b_pro  <- round(rt_pro[5], 3)
+m1_puz3_se_pro <- round(rt_pro[17], 3)
+m1_puz3_p_pro  <- round(rt_pro[41], 3)
+
+m1_puz4_b_full  <- round(rt[6], 3)
+m1_puz4_b_pro  <- round(rt_pro[6], 3)
+m1_puz4_b_org  <- round(rt_org[6], 3)
+
+
+m1_puz5_b_full  <- round(rt[7], 3)
+m1_puz5_b_pro  <- round(rt_pro[7], 3)
+m1_puz5_b_org  <- round(rt_org[7], 3)
+
+
+
+
+m1_puz3_b_pro  
+m1_puz3_se_pro
+m1_puz3_p_pro
+round(exp(m1_puz3_b_full),3)
+round(exp(m1_puz3_b_pro),3)
+round(exp(m1_puz3_b_org),3)
+```
+
+We estimated Negative Binomial regression models to evaluate whether
+assigning difficulty labels (“Easy” or “Hard”) influences the number of
+attempts participants make on each puzzle. Models were fit separately
+for the full sample, organically recruited participants, and
+participants recruited through Prolific. All models include controls for
+puzzle identity, puzzle skill rating, source, age, quantitative
+exposure, energy level, and device type. Standard errors are clustered
+by participant to account for repeated observations.
+
+**Difficulty Label Effects**: Across all three samples, neither the Easy
+Label nor the Hard Label produced statistically detectable changes in
+attempt count relative to the Unlabeled baseline condition. Coefficients
+for both labels are small in magnitude and accompanied by large standard
+errors, indicating substantial uncertainty around the estimated effects.
+Assigning puzzles an Easy or Hard difficulty label did not meaningfully
+alter how many attempts participants made.
+
+**Puzzle Effects**: Puzzle identity shows consistent and substantial
+associations with attempt count. Relative to the baseline puzzle(puzzle
+1), Puzzle 2 and Puzzle 3 exhibit large positive coefficients across all
+samples, indicating significantly higher expected attempt counts. These
+effects are statistically significant at the 1 percent level in every
+group. Puzzle 4 and Puzzle 5 also show positive associations, though
+their significance varies by sample. All these effects positive with
+respect the puzzle1, the baseline, meaning they had more attempts than
+puzzle1. The interpretation of the significant effects are as follows.
+Puzzle 2 had `r round(exp(m1_puz2_b_full),3)`% more attempts than the
+baseline puzzle in the full pool of participants,
+`r round(exp(m1_puz2_b_org),3)`% more attempts than the baseline puzzle
+in the organic participant group, and `r round(exp(m1_puz2_b_pro),3)`%
+more attempts than the baseline puzzle in the prolific participant
+group. Puzzle 3 had `r round(exp(m1_puz3_b_full),3)`% more attempts than
+the baseline puzzle in the full pool of participants,
+`r round(exp(m1_puz3_b_org),3)`% more attempts than the baseline puzzle
+in the organic participant group, and `r round(exp(m1_puz3_b_pro),3)`%
+more attempts than the baseline puzzle in the prolific participant
+group. Puzzle 4 had `r round(exp(m1_puz4_b_pro),3)`% more attempts than
+the baseline puzzle in the prolific participant group. Puzzle 5 had
+`r round(exp(m1_puz5_b_full),3)`% more attempts than the baseline puzzle
+in the full pool of participants, and `r round(exp(m1_puz5_b_pro),3)`%
+more attempts than the baseline puzzle in the prolific participant
+group.
+
+All in all, difficulty labels did not influence how many attempts
+participants made, regardless of recruitment source. However, puzzle
+identity consistently predicted attempt count, with some puzzles
+eliciting substantially more attempts than others. These findings
+indicate that puzzle‑specific features, rather than externally assigned
+difficulty labels, shape participant behavior in this task.
+
+```{r fig-coef, fig.width=5, fig.height=2.5, fig.pos="H", fig.align="center", out.width="0.65\\textwidth", fig.cap="Point estimates and 95\\% confidence intervals for the effect of difficulty labels on log time engaged relative to the no label control. Error bars are based on cluster-robust standard errors."}
+coef_df <- data.frame(
+  term = c("Easy Label", "Hard Label"),
+  est  = c(rt$beta[rt$Coef == "treatmenteasy_label"],
+           rt$beta[rt$Coef == "treatmenthard_label"]),
+  se   = c(rt$SE[rt$Coef == "treatmenteasy_label"],
+           rt$SE[rt$Coef == "treatmenthard_label"])
+) %>%
+  mutate(lo = est - 1.96 * se, hi = est + 1.96 * se)
+
+ggplot(coef_df, aes(x = est, y = term)) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "gray50") +
+  geom_errorbar(aes(xmin = lo, xmax = hi), width = 0.15) +
+  geom_point(size = 3) +
+  labs(x = "Estimated Effect on Log Time Engaged", y = NULL,
+       title    = "Effect of Difficulty Labels on Engagement",
+       subtitle = "Relative to no-label control; error bars are 95% CIs") +
+  theme_bw(base_size = 9)
+```
+
+As shown in Figure \@ref(fig:fig-coef), the confidence intervals for
+both estimates are wide and cross zero, so we can't say much about the
+true direction of either effect. H3 is also not supported — the hard
+label point estimate is actually below the easy label estimate, the
+opposite of what we predicted.
+
+##Appendix
 
 ### A. Residual Diagnostics
 

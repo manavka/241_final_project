@@ -1,5 +1,6 @@
 {
   "dependencies": {
-    "firestore-export-import": "^1.6.0"
-  }
+    "firestore-export-import": "^1.7.0"
+  },
+  "scripts-prepend-node-path": "true"
 }
