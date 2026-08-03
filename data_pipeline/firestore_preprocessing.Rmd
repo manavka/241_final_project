@@ -12,6 +12,9 @@ editor_options:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+
+
+
 ## Data Preprocessing
 
 Data preprocessing of .json file from Firestore.
@@ -27,6 +30,7 @@ library(lme4)
 library(clubSandwich)
 library(lmtest)
 library(pwr)
+
 
 # Load raw JSON — simplifyVector = FALSE preserves irregular arrays as lists
 raw_data <- fromJSON("firestore_export.json", simplifyVector = FALSE)
@@ -86,6 +90,7 @@ experiment_master <- gamelogs_df %>%
   select(-starts_with("document_id"))
 
 glimpse(experiment_master)
+saveRDS(experiment_master, "experiment_master.rds")
 ```
 
 ## Covariate Balance Check
@@ -93,6 +98,7 @@ glimpse(experiment_master)
 Check randomization frequencies across treatment arms.
 
 ```{r balance-check}
+library(kableExtra)
 user_level <- experiment_master %>%
   distinct(userId, .keep_all = TRUE) %>%
   mutate(source = ifelse(!is.na(prolificPid), "Prolific", "Organic"))
@@ -340,6 +346,7 @@ cat("Saved analysis_data.rds\n")
 ## Attrition Analysis
 
 ```{r attrition, results = 'asis'}
+library(stargazer)
 user_level <- master %>% distinct(userId, .keep_all = TRUE)
 
 # Attrition rates by source and treatment
