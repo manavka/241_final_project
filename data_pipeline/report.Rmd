@@ -1506,12 +1506,19 @@ in the full pool of participants, and `r round(exp(m1_puz5_b_pro),3)`%
 more attempts than the baseline puzzle in the prolific participant
 group.
 
-All in all, difficulty labels did not influence how many attempts
-participants made, regardless of recruitment source. However, puzzle
-identity consistently predicted attempt count, with some puzzles
-eliciting substantially more attempts than others. These findings
-indicate that puzzle‑specific features, rather than externally assigned
+
+
+## Conclusion
+In conclusion, our primary mode, measuring the effect of difficulty labels on log time engaged showed that neither the hard label nor the easy label had a statistically significant effect on log time engaged relative to the no-label control in the full sample. However, the hard label is consistently negative across both subgroups s marginally significant at the 10% level. 
+
+Our secondary model for the effect of difficulty labels on zero attempt skips, showed no significant effects as well. However, it is notable that the easy label effect on zero-attempt skips is driven entirely by Prolific participants. This is likely reflects differences in how each group engages with task framing. Prolific participants are experienced study participants with a financial incentive to complete the puzzles as fast as possible. If they are told a puzzle is easy, then struggle with it, they may feel more obligated to attempt the puzzle as they know that they may not be paid for poor quality data. Our organic group had no financial incentive, so they may be more likely to skip a question they find challenging as they receive nothing regardless of data quality. 
+
+Our secondary model for the effect of difficulty labels on attempt count showed that difficulty labels did not influence how many attempts
+participants made, regardless of recruitment source. However, puzzle identity consistently predicted attempt count, with some puzzles
+eliciting substantially more attempts than others. These findings indicate that puzzle‑specific features, rather than externally assigned
 difficulty labels, shape participant behavior in this task.
+
+All in all, our models found no significant effects for the treatment labels. We were able to find significant effects for the puzzles effect on attempt counts but these should not be interpreted as causal claims as they are not randomly assigned. If we could do this experiment again with an unlimited budget, we would like to recruit more participants, all from prolific, as our experiment was under powered. We would elect for only prolific participants as our organic participants had a higher variance in most outcomes as they were more likely to be distracted, reducing the effect of the treatment labels. 
 
 
 ## Appendix
