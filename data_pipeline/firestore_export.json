@@ -1003,6 +1003,36 @@
       "totalScore": 0,
       "breakLog": []
     },
+    "582G8DvzJS5APu3sKNtR": {
+      "userId": "local_mg0icyrnu",
+      "treatment": "no_label",
+      "ipAddress": "24.146.212.181",
+      "isReplay": true,
+      "recruitmentSource": "organic",
+      "multiSession": false,
+      "resumeRounds": [],
+      "timestamp": "2026-08-02T21:09:55.923Z",
+      "deviceType": "Desktop",
+      "puzzleOrder": [
+        "puzzle_05",
+        "puzzle_01",
+        "puzzle_03",
+        "puzzle_04",
+        "puzzle_02"
+      ],
+      "breakLog": [],
+      "sessionComplete": false,
+      "honestyCheck": null,
+      "sharedDevice": "returning",
+      "age": 35,
+      "gender": "Female",
+      "educationLevel": "Master's degree",
+      "quantitativeExposure": 3,
+      "energyLevel": 2,
+      "puzzleFrequency": "A few times a year",
+      "puzzleSkill": 3,
+      "puzzleEnjoyment": 3
+    },
     "5FSkVSAcKTODzHEnhCdK": {
       "userId": "local_2fj5hrruk",
       "treatment": "easy_label",
@@ -2289,6 +2319,35 @@
       "sessionComplete": true,
       "totalScore": 192,
       "honestyCheck": "solo"
+    },
+    "BvqanOKS0qhu1MCdbXCL": {
+      "userId": "local_l3fplqjxe",
+      "treatment": "easy_label",
+      "ipAddress": "107.3.128.11",
+      "isReplay": false,
+      "recruitmentSource": "organic",
+      "multiSession": false,
+      "resumeRounds": [],
+      "timestamp": "2026-08-02T04:42:25.659Z",
+      "deviceType": "Mobile",
+      "puzzleOrder": [
+        "puzzle_03",
+        "puzzle_01",
+        "puzzle_02",
+        "puzzle_05",
+        "puzzle_04"
+      ],
+      "breakLog": [],
+      "sessionComplete": false,
+      "honestyCheck": null,
+      "age": 39,
+      "gender": "Female",
+      "educationLevel": "Some college (no degree)",
+      "quantitativeExposure": 3,
+      "energyLevel": 3,
+      "puzzleFrequency": "Monthly",
+      "puzzleSkill": 2,
+      "puzzleEnjoyment": 4
     },
     "C5DNDuWAdtvs0Dt9pTVS": {
       "userId": "local_8av6fk4qn",
@@ -3936,6 +3995,36 @@
       "puzzleSkill": 3,
       "puzzleEnjoyment": 4
     },
+    "JOByNn6lduRn1OXhufWs": {
+      "userId": "local_jd5xlu7du",
+      "treatment": "hard_label",
+      "ipAddress": "24.130.179.64",
+      "isReplay": true,
+      "recruitmentSource": "organic",
+      "multiSession": false,
+      "resumeRounds": [],
+      "timestamp": "2026-08-02T23:55:31.905Z",
+      "deviceType": "Desktop",
+      "puzzleOrder": [
+        "puzzle_03",
+        "puzzle_01",
+        "puzzle_02",
+        "puzzle_04",
+        "puzzle_05"
+      ],
+      "breakLog": [],
+      "sessionComplete": false,
+      "honestyCheck": null,
+      "sharedDevice": "new_player",
+      "age": 23,
+      "gender": "Non-binary",
+      "educationLevel": "Master's degree",
+      "quantitativeExposure": 3,
+      "energyLevel": 3,
+      "puzzleFrequency": "Monthly",
+      "puzzleSkill": 3,
+      "puzzleEnjoyment": 3
+    },
     "JRGrIibK7yhMbcIkbjC1": {
       "userId": "local_3vnx7i497",
       "treatment": "no_label",
@@ -5532,6 +5621,36 @@
       "totalScore": 0,
       "honestyCheck": "solo"
     },
+    "QlXshmeSKAu0IxAYqwSW": {
+      "puzzleOrder": [
+        "puzzle_05",
+        "puzzle_02",
+        "puzzle_01",
+        "puzzle_04",
+        "puzzle_03"
+      ],
+      "energyLevel": 1,
+      "age": 30,
+      "isReplay": false,
+      "ipAddress": "172.91.28.12",
+      "userId": "local_m81ra0zrn",
+      "puzzleSkill": 2,
+      "multiSession": false,
+      "quantitativeExposure": 2,
+      "timestamp": "2026-07-27T09:17:11.317Z",
+      "recruitmentSource": "organic",
+      "treatment": "no_label",
+      "educationLevel": "Bachelor's degree",
+      "resumeRounds": [],
+      "puzzleFrequency": "A few times a year",
+      "deviceType": "Desktop",
+      "puzzleEnjoyment": 3,
+      "gender": "Male",
+      "breakLog": [],
+      "sessionComplete": true,
+      "totalScore": 191,
+      "honestyCheck": "solo"
+    },
     "QngSe0eyRtqb57iwS3y2": {
       "userId": "local_apr7wrp5z",
       "treatment": "no_label",
@@ -5931,6 +6050,36 @@
       "totalScore": 462,
       "honestyCheck": "solo"
     },
+    "T3K0V5HshIbAOJzzoFil": {
+      "breakLog": [],
+      "userId": "local_j4mftp5gm",
+      "isReplay": false,
+      "treatment": "hard_label",
+      "resumeRounds": [],
+      "age": 49,
+      "puzzleSkill": 3,
+      "puzzleFrequency": "Daily",
+      "energyLevel": 4,
+      "puzzleOrder": [
+        "puzzle_02",
+        "puzzle_03",
+        "puzzle_01",
+        "puzzle_04",
+        "puzzle_05"
+      ],
+      "educationLevel": "Bachelor's degree",
+      "ipAddress": "184.23.37.85",
+      "gender": "Female",
+      "puzzleEnjoyment": 5,
+      "deviceType": "Mobile",
+      "recruitmentSource": "organic",
+      "quantitativeExposure": 4,
+      "timestamp": "2026-07-22T17:11:07.875Z",
+      "multiSession": false,
+      "sessionComplete": true,
+      "totalScore": 343,
+      "honestyCheck": "solo"
+    },
     "TBSlcUufrXjuqiRgig6G": {
       "userId": "local_up22l9f29",
       "treatment": "easy_label",
@@ -6217,6 +6366,35 @@
       "sessionComplete": true,
       "totalScore": 250,
       "honestyCheck": "solo"
+    },
+    "V88emit8C48iUt7apVfu": {
+      "userId": "local_qqx4quadj",
+      "treatment": "no_label",
+      "ipAddress": "76.191.186.144",
+      "isReplay": false,
+      "recruitmentSource": "organic",
+      "multiSession": false,
+      "resumeRounds": [],
+      "timestamp": "2026-08-02T23:55:47.712Z",
+      "deviceType": "Desktop",
+      "puzzleOrder": [
+        "puzzle_02",
+        "puzzle_04",
+        "puzzle_01",
+        "puzzle_05",
+        "puzzle_03"
+      ],
+      "breakLog": [],
+      "sessionComplete": false,
+      "honestyCheck": null,
+      "age": 99,
+      "gender": "Female",
+      "educationLevel": "Master's degree",
+      "quantitativeExposure": 4,
+      "energyLevel": 3,
+      "puzzleFrequency": "Weekly",
+      "puzzleSkill": 3,
+      "puzzleEnjoyment": 5
     },
     "VG6lEzpG6Mm2eYyhFEBj": {
       "userId": "local_aun91nm3i",
@@ -7432,6 +7610,36 @@
       "multiSession": false,
       "honestyCheck": null
     },
+    "ZkbYGpXUq2lxOcPOKDNb": {
+      "userId": "local_03w0bmiec",
+      "treatment": "easy_label",
+      "ipAddress": "98.186.99.149",
+      "isReplay": true,
+      "recruitmentSource": "organic",
+      "multiSession": false,
+      "resumeRounds": [],
+      "timestamp": "2026-08-02T23:55:31.701Z",
+      "deviceType": "Desktop",
+      "puzzleOrder": [
+        "puzzle_03",
+        "puzzle_04",
+        "puzzle_02",
+        "puzzle_05",
+        "puzzle_01"
+      ],
+      "breakLog": [],
+      "sessionComplete": false,
+      "honestyCheck": null,
+      "sharedDevice": "returning",
+      "age": 25,
+      "gender": "Other",
+      "educationLevel": "Prefer not to say",
+      "quantitativeExposure": 5,
+      "energyLevel": 5,
+      "puzzleFrequency": "Daily",
+      "puzzleSkill": 4,
+      "puzzleEnjoyment": 4
+    },
     "a3cRZVlQ8aCtPDYRIAib": {
       "userId": "local_kn9d5y3h7",
       "treatment": "hard_label",
@@ -7464,6 +7672,36 @@
       "puzzleSkill": 5,
       "puzzleEnjoyment": 5,
       "prolificRejected": true
+    },
+    "a8Oc8hgPCmniFmKxswTg": {
+      "gender": "Female",
+      "sharedDevice": "returning",
+      "isReplay": true,
+      "age": 61,
+      "userId": "local_n2q7u8gu6",
+      "puzzleOrder": [
+        "puzzle_05",
+        "puzzle_01",
+        "puzzle_02",
+        "puzzle_04",
+        "puzzle_03"
+      ],
+      "energyLevel": 3,
+      "puzzleSkill": 4,
+      "treatment": "no_label",
+      "puzzleFrequency": "Weekly",
+      "sessionComplete": false,
+      "honestyCheck": null,
+      "recruitmentSource": "organic",
+      "quantitativeExposure": 4,
+      "deviceType": "Mobile",
+      "breakLog": [],
+      "ipAddress": "172.59.129.184",
+      "timestamp": "2026-07-25T02:04:34.173Z",
+      "puzzleEnjoyment": 4,
+      "educationLevel": "Bachelor's degree",
+      "resumeRounds": [],
+      "multiSession": false
     },
     "aCk68qT8XWhDJJY0Ee5m": {
       "userId": "local_fbnr0ku3h",
@@ -7823,6 +8061,35 @@
       "totalScore": 168,
       "honestyCheck": "solo"
     },
+    "bdVBdO2HTTED4dOtSLIK": {
+      "gender": "Other",
+      "isReplay": false,
+      "userId": "local_6fcd42fqv",
+      "honestyCheck": null,
+      "deviceType": "Mobile",
+      "sessionComplete": false,
+      "puzzleOrder": [
+        "puzzle_01",
+        "puzzle_04",
+        "puzzle_05",
+        "puzzle_03",
+        "puzzle_02"
+      ],
+      "ipAddress": "184.23.37.85",
+      "multiSession": false,
+      "quantitativeExposure": 3,
+      "recruitmentSource": "organic",
+      "treatment": "hard_label",
+      "age": 18,
+      "puzzleFrequency": "Never",
+      "energyLevel": 3,
+      "timestamp": "2026-07-22T21:54:25.252Z",
+      "puzzleSkill": 3,
+      "resumeRounds": [],
+      "puzzleEnjoyment": 3,
+      "educationLevel": "Prefer not to say",
+      "breakLog": []
+    },
     "c740f4UoudIRlsvTkhNT": {
       "userId": "local_p0heirz4x",
       "treatment": "no_label",
@@ -8133,6 +8400,35 @@
       "totalScore": 447,
       "honestyCheck": "solo"
     },
+    "eAPLMfZDa8Afztw7NqMD": {
+      "puzzleSkill": 2,
+      "sessionComplete": false,
+      "energyLevel": 1,
+      "recruitmentSource": "organic",
+      "ipAddress": "99.145.192.192",
+      "userId": "local_pq26yv2bo",
+      "timestamp": "2026-07-23T23:08:32.793Z",
+      "age": 31,
+      "isReplay": false,
+      "deviceType": "Mobile",
+      "gender": "Male",
+      "multiSession": false,
+      "quantitativeExposure": 1,
+      "resumeRounds": [],
+      "puzzleEnjoyment": 3,
+      "breakLog": [],
+      "honestyCheck": null,
+      "educationLevel": "High school diploma or GED",
+      "puzzleFrequency": "A few times a year",
+      "puzzleOrder": [
+        "puzzle_03",
+        "puzzle_04",
+        "puzzle_01",
+        "puzzle_02",
+        "puzzle_05"
+      ],
+      "treatment": "hard_label"
+    },
     "eHvF9xNkMPSNSw1jG7t6": {
       "userId": "local_3tx34jm9b",
       "treatment": "no_label",
@@ -8318,6 +8614,35 @@
       "sessionComplete": true,
       "totalScore": 313,
       "honestyCheck": "solo"
+    },
+    "eotlevdjpsSRTWfYdNxp": {
+      "age": 35,
+      "ipAddress": "108.212.68.148",
+      "puzzleOrder": [
+        "puzzle_03",
+        "puzzle_04",
+        "puzzle_01",
+        "puzzle_05",
+        "puzzle_02"
+      ],
+      "timestamp": "2026-07-22T17:41:19.058Z",
+      "sessionComplete": false,
+      "breakLog": [],
+      "deviceType": "Mobile",
+      "recruitmentSource": "organic",
+      "honestyCheck": null,
+      "energyLevel": 3,
+      "multiSession": false,
+      "resumeRounds": [],
+      "treatment": "no_label",
+      "userId": "local_gqq39n0rn",
+      "gender": "Male",
+      "quantitativeExposure": 2,
+      "isReplay": false,
+      "puzzleEnjoyment": 4,
+      "puzzleSkill": 3,
+      "educationLevel": "Bachelor's degree",
+      "puzzleFrequency": "A few times a year"
     },
     "fAFhtM3bTONn2QSqZ96W": {
       "userId": "local_5iixh2594",
@@ -8757,6 +9082,36 @@
       "puzzleEnjoyment": 5,
       "sessionComplete": true,
       "totalScore": 374,
+      "honestyCheck": "solo"
+    },
+    "hKXshv3QZG6CDpvfcJhS": {
+      "energyLevel": 3,
+      "multiSession": false,
+      "breakLog": [],
+      "deviceType": "Mobile",
+      "quantitativeExposure": 4,
+      "recruitmentSource": "organic",
+      "isReplay": false,
+      "userId": "local_arr7855kj",
+      "puzzleFrequency": "Weekly",
+      "gender": "Female",
+      "timestamp": "2026-07-25T01:28:57.445Z",
+      "resumeRounds": [],
+      "educationLevel": "Bachelor's degree",
+      "ipAddress": "172.59.129.134",
+      "puzzleEnjoyment": 4,
+      "age": 61,
+      "puzzleSkill": 4,
+      "treatment": "hard_label",
+      "puzzleOrder": [
+        "puzzle_04",
+        "puzzle_03",
+        "puzzle_02",
+        "puzzle_05",
+        "puzzle_01"
+      ],
+      "sessionComplete": true,
+      "totalScore": 231,
       "honestyCheck": "solo"
     },
     "hRcHmvqiXQkRN15V7oNY": {
@@ -10157,6 +10512,36 @@
       "puzzleSkill": 3,
       "puzzleEnjoyment": 4
     },
+    "puLm6DRYei871EbqNhMX": {
+      "puzzleSkill": 2,
+      "puzzleEnjoyment": 3,
+      "gender": "Female",
+      "multiSession": false,
+      "quantitativeExposure": 4,
+      "userId": "local_u7tfossmb",
+      "puzzleOrder": [
+        "puzzle_02",
+        "puzzle_04",
+        "puzzle_01",
+        "puzzle_03",
+        "puzzle_05"
+      ],
+      "isReplay": false,
+      "deviceType": "Mobile",
+      "timestamp": "2026-07-26T11:27:40.496Z",
+      "resumeRounds": [],
+      "age": 33,
+      "recruitmentSource": "organic",
+      "ipAddress": "85.255.232.16",
+      "treatment": "easy_label",
+      "educationLevel": "PhD or doctoral degree",
+      "puzzleFrequency": "A few times a year",
+      "energyLevel": 2,
+      "breakLog": [],
+      "sessionComplete": true,
+      "totalScore": 260,
+      "honestyCheck": "solo"
+    },
     "pyDHaiVi5NoVSuuvjiav": {
       "userId": "local_vof84j0ao",
       "treatment": "easy_label",
@@ -10621,6 +11006,36 @@
       "totalScore": 0,
       "honestyCheck": "solo"
     },
+    "rW9Z9oe7hQxEOJTZ5Oso": {
+      "userId": "local_qqwaaip6r",
+      "treatment": "no_label",
+      "ipAddress": "24.146.212.181",
+      "isReplay": true,
+      "recruitmentSource": "organic",
+      "multiSession": false,
+      "resumeRounds": [],
+      "timestamp": "2026-08-02T21:11:13.055Z",
+      "deviceType": "Desktop",
+      "puzzleOrder": [
+        "puzzle_05",
+        "puzzle_03",
+        "puzzle_04",
+        "puzzle_02",
+        "puzzle_01"
+      ],
+      "breakLog": [],
+      "sessionComplete": false,
+      "honestyCheck": null,
+      "sharedDevice": "returning",
+      "age": 35,
+      "gender": "Female",
+      "educationLevel": "Master's degree",
+      "quantitativeExposure": 3,
+      "energyLevel": 3,
+      "puzzleFrequency": "A few times a year",
+      "puzzleSkill": 3,
+      "puzzleEnjoyment": 3
+    },
     "rZmoakY1Sd9uf2wPJrov": {
       "userId": "local_50gce3guu",
       "treatment": "hard_label",
@@ -10801,6 +11216,36 @@
       "sessionComplete": true,
       "totalScore": 265,
       "breakLog": []
+    },
+    "sBOWUuz7iCaTrkFMKrUT": {
+      "userId": "local_i3bxsv6vu",
+      "gender": "Male",
+      "timestamp": "2026-07-27T17:36:09.693Z",
+      "recruitmentSource": "organic",
+      "quantitativeExposure": 4,
+      "treatment": "easy_label",
+      "energyLevel": 3,
+      "age": 34,
+      "resumeRounds": [],
+      "educationLevel": "Bachelor's degree",
+      "ipAddress": "136.226.79.101",
+      "puzzleEnjoyment": 2,
+      "puzzleFrequency": "A few times a year",
+      "puzzleOrder": [
+        "puzzle_05",
+        "puzzle_02",
+        "puzzle_04",
+        "puzzle_03",
+        "puzzle_01"
+      ],
+      "isReplay": false,
+      "breakLog": [],
+      "deviceType": "Desktop",
+      "multiSession": false,
+      "puzzleSkill": 2,
+      "sessionComplete": true,
+      "totalScore": 417,
+      "honestyCheck": "solo"
     },
     "sQqHjMP7kRVVhmYYnEq7": {
       "userId": "local_qbuvotzze",
@@ -12276,6 +12721,22 @@
       "treatment": "no_label",
       "isReplay": false
     },
+    "0ABqvJa5P9psdpTyqTRQ": {
+      "userId": "local_03w0bmiec",
+      "roundNumber": 1,
+      "puzzleId": "puzzle_03",
+      "timeEngaged": 1,
+      "isSolved": false,
+      "didSkip": false,
+      "attemptCount": 0,
+      "rageClicks": 0,
+      "rapidGuesses": 0,
+      "rawSubmissionTimestamps": [],
+      "tabSwitchCount": 0,
+      "tabSwitchTimePaused": 0,
+      "treatment": "easy_label",
+      "isReplay": true
+    },
     "0Cx51orG3f4rc1x5qMD2": {
       "userId": "local_cb75krked",
       "roundNumber": 3,
@@ -12923,6 +13384,22 @@
       "tabSwitchCount": 0,
       "tabSwitchTimePaused": 0,
       "treatment": "easy_label",
+      "isReplay": false
+    },
+    "1LvligdDulcrxXYkDbLM": {
+      "userId": "local_qqx4quadj",
+      "roundNumber": 1,
+      "puzzleId": "puzzle_02",
+      "timeEngaged": 5,
+      "isSolved": false,
+      "didSkip": false,
+      "attemptCount": 0,
+      "rageClicks": 0,
+      "rapidGuesses": 0,
+      "rawSubmissionTimestamps": [],
+      "tabSwitchCount": 0,
+      "tabSwitchTimePaused": 0,
+      "treatment": "no_label",
       "isReplay": false
     },
     "1MSS2mdR7hJjyibZvJMs": {
@@ -13950,6 +14427,26 @@
       "tabSwitchTimePaused": 23.64,
       "treatment": "easy_label",
       "isReplay": false
+    },
+    "3LhfSFYZbNtL4JHSNHV4": {
+      "rawSubmissionTimestamps": [
+        1785065867521
+      ],
+      "roundNumber": 1,
+      "userId": "local_u7tfossmb",
+      "rageClicks": 0,
+      "puzzleId": "puzzle_02",
+      "rapidGuesses": 0,
+      "firstAnswerCorrect": true,
+      "attemptCount": 1,
+      "timeToFirstAttempt": 517,
+      "didSkip": false,
+      "tabSwitchCount": 2,
+      "isSolved": true,
+      "timeEngaged": 518,
+      "tabSwitchTimePaused": 37.22,
+      "isReplay": false,
+      "treatment": "easy_label"
     },
     "3MB3ViakBayTm67KhvAC": {
       "userId": "local_41u5r85re",
@@ -16089,6 +16586,26 @@
       "treatment": "hard_label",
       "isReplay": false
     },
+    "6ceLveGXZdmtUy2ScVYd": {
+      "timeEngaged": 9,
+      "timeToFirstAttempt": 9,
+      "attemptCount": 1,
+      "isSolved": true,
+      "roundNumber": 4,
+      "firstAnswerCorrect": true,
+      "tabSwitchTimePaused": 0,
+      "didSkip": false,
+      "rapidGuesses": 0,
+      "treatment": "no_label",
+      "userId": "local_m81ra0zrn",
+      "puzzleId": "puzzle_04",
+      "rawSubmissionTimestamps": [
+        1785144218221
+      ],
+      "isReplay": false,
+      "tabSwitchCount": 0,
+      "rageClicks": 0
+    },
     "6ekQPfcfMcSRVx9LpRoF": {
       "userId": "local_rl7embxn7",
       "roundNumber": 2,
@@ -18009,6 +18526,26 @@
       "rageClicks": 0,
       "rapidGuesses": 0,
       "rawSubmissionTimestamps": [],
+      "tabSwitchCount": 0,
+      "tabSwitchTimePaused": 0,
+      "treatment": "easy_label",
+      "isReplay": false
+    },
+    "AGu0x624bPmKNzMnCuLF": {
+      "userId": "local_l3fplqjxe",
+      "roundNumber": 1,
+      "puzzleId": "puzzle_03",
+      "timeEngaged": 103,
+      "isSolved": false,
+      "didSkip": true,
+      "attemptCount": 1,
+      "firstAnswerCorrect": false,
+      "timeToFirstAttempt": 100,
+      "rageClicks": 0,
+      "rapidGuesses": 0,
+      "rawSubmissionTimestamps": [
+        1785645920837
+      ],
       "tabSwitchCount": 0,
       "tabSwitchTimePaused": 0,
       "treatment": "easy_label",
@@ -21185,6 +21722,26 @@
       "tabSwitchTimePaused": 5.05,
       "treatment": "easy_label",
       "isReplay": false
+    },
+    "G0s4OBhy737aer4O6wz9": {
+      "roundNumber": 4,
+      "rapidGuesses": 0,
+      "puzzleId": "puzzle_05",
+      "isReplay": false,
+      "isSolved": false,
+      "rageClicks": 0,
+      "didSkip": true,
+      "rawSubmissionTimestamps": [
+        1784944538949
+      ],
+      "tabSwitchTimePaused": 0,
+      "userId": "local_arr7855kj",
+      "firstAnswerCorrect": false,
+      "treatment": "hard_label",
+      "tabSwitchCount": 0,
+      "attemptCount": 1,
+      "timeToFirstAttempt": 183,
+      "timeEngaged": 200
     },
     "G2mu7M3sB5bmC1y9iDQ4": {
       "userId": "local_w4jy2o9t8",
@@ -24774,6 +25331,26 @@
       "treatment": "hard_label",
       "isReplay": false
     },
+    "Mm2otgNg9m5X7UYLkSD3": {
+      "rapidGuesses": 0,
+      "isSolved": false,
+      "userId": "local_u7tfossmb",
+      "tabSwitchCount": 1,
+      "attemptCount": 1,
+      "isReplay": false,
+      "tabSwitchTimePaused": 20.31,
+      "treatment": "easy_label",
+      "rageClicks": 0,
+      "timeEngaged": 1240,
+      "rawSubmissionTimestamps": [
+        1785067675917
+      ],
+      "timeToFirstAttempt": 1184,
+      "roundNumber": 5,
+      "firstAnswerCorrect": false,
+      "didSkip": true,
+      "puzzleId": "puzzle_05"
+    },
     "MnT2YJIEuCWFuV7cUGW2": {
       "userId": "local_0dux5t3qb",
       "roundNumber": 4,
@@ -25217,6 +25794,26 @@
       "tabSwitchTimePaused": 0,
       "treatment": "no_label",
       "isReplay": false
+    },
+    "Nd15jUKEOR8M0JO11ENB": {
+      "tabSwitchTimePaused": 0,
+      "tabSwitchCount": 0,
+      "isSolved": true,
+      "rawSubmissionTimestamps": [
+        1785066247064
+      ],
+      "rageClicks": 0,
+      "userId": "local_u7tfossmb",
+      "timeEngaged": 303,
+      "firstAnswerCorrect": true,
+      "rapidGuesses": 0,
+      "didSkip": false,
+      "timeToFirstAttempt": 302,
+      "attemptCount": 1,
+      "isReplay": false,
+      "treatment": "easy_label",
+      "puzzleId": "puzzle_01",
+      "roundNumber": 3
     },
     "NdYbf2ihi7ZfEphHWyZC": {
       "userId": "local_fezzd9ytx",
@@ -30113,6 +30710,26 @@
       "treatment": "easy_label",
       "isReplay": false
     },
+    "WEXe82WyTy5aAdVDFXj1": {
+      "rageClicks": 0,
+      "firstAnswerCorrect": true,
+      "rapidGuesses": 0,
+      "isSolved": true,
+      "roundNumber": 5,
+      "tabSwitchTimePaused": 0,
+      "userId": "local_arr7855kj",
+      "attemptCount": 1,
+      "timeToFirstAttempt": 443,
+      "isReplay": false,
+      "timeEngaged": 443,
+      "rawSubmissionTimestamps": [
+        1784945009780
+      ],
+      "puzzleId": "puzzle_01",
+      "treatment": "hard_label",
+      "tabSwitchCount": 0,
+      "didSkip": false
+    },
     "WEcD2VAZFNgFm8uHPh62": {
       "userId": "local_8rgatdynz",
       "roundNumber": 1,
@@ -31997,6 +32614,28 @@
       "treatment": "hard_label",
       "isReplay": false
     },
+    "ZAFs9MNZAFE49BSTQrSE": {
+      "firstAnswerCorrect": false,
+      "treatment": "hard_label",
+      "puzzleId": "puzzle_05",
+      "timeEngaged": 2078,
+      "rawSubmissionTimestamps": [
+        1784744051034,
+        1784746202740,
+        1784746263142
+      ],
+      "isReplay": false,
+      "rageClicks": 0,
+      "timeToFirstAttempt": 1011,
+      "tabSwitchCount": 14,
+      "rapidGuesses": 0,
+      "attemptCount": 3,
+      "isSolved": true,
+      "didSkip": false,
+      "userId": "local_j4mftp5gm",
+      "tabSwitchTimePaused": 1160.15,
+      "roundNumber": 5
+    },
     "ZCBII7OggmtTzW8U15ap": {
       "userId": "local_3eao9ajc4",
       "roundNumber": 3,
@@ -32829,6 +33468,26 @@
       "treatment": "easy_label",
       "isReplay": false
     },
+    "azWQ0jCXGf4kOR4JelcZ": {
+      "firstAnswerCorrect": true,
+      "didSkip": false,
+      "treatment": "easy_label",
+      "tabSwitchCount": 0,
+      "rageClicks": 0,
+      "attemptCount": 1,
+      "timeEngaged": 28,
+      "timeToFirstAttempt": 28,
+      "rapidGuesses": 0,
+      "tabSwitchTimePaused": 0,
+      "userId": "local_i3bxsv6vu",
+      "isReplay": false,
+      "puzzleId": "puzzle_04",
+      "roundNumber": 3,
+      "isSolved": true,
+      "rawSubmissionTimestamps": [
+        1785173992346
+      ]
+    },
     "b1bTb9CqIlw7R8Nh4Pww": {
       "userId": "local_2xwp3kg67",
       "roundNumber": 5,
@@ -32976,6 +33635,28 @@
       "tabSwitchTimePaused": 0.93,
       "treatment": "hard_label",
       "isReplay": false
+    },
+    "b9CiSfCcS1hajE5k9HRW": {
+      "puzzleId": "puzzle_01",
+      "tabSwitchTimePaused": 44.81,
+      "rageClicks": 0,
+      "treatment": "easy_label",
+      "rawSubmissionTimestamps": [
+        1785174378778,
+        1785174392892,
+        1785174397845
+      ],
+      "rapidGuesses": 0,
+      "tabSwitchCount": 4,
+      "isSolved": true,
+      "userId": "local_i3bxsv6vu",
+      "didSkip": false,
+      "timeEngaged": 151,
+      "firstAnswerCorrect": false,
+      "timeToFirstAttempt": 132,
+      "isReplay": false,
+      "attemptCount": 3,
+      "roundNumber": 5
     },
     "bAviCErzCsDT1Z4RdBbN": {
       "userId": "local_i10dsttt2",
@@ -33355,6 +34036,26 @@
       "treatment": "no_label",
       "isReplay": false
     },
+    "bqA2X1ULeUNOhzVcuSlh": {
+      "firstAnswerCorrect": true,
+      "attemptCount": 1,
+      "tabSwitchTimePaused": 0,
+      "rageClicks": 0,
+      "userId": "local_j4mftp5gm",
+      "isReplay": false,
+      "isSolved": true,
+      "roundNumber": 2,
+      "timeToFirstAttempt": 78,
+      "tabSwitchCount": 0,
+      "puzzleId": "puzzle_03",
+      "treatment": "hard_label",
+      "didSkip": false,
+      "rawSubmissionTimestamps": [
+        1784742705744
+      ],
+      "timeEngaged": 79,
+      "rapidGuesses": 0
+    },
     "brxC2YfhAbPrcymnfA79": {
       "userId": "local_3v5iq5nyw",
       "roundNumber": 5,
@@ -33374,6 +34075,26 @@
       "tabSwitchTimePaused": 0,
       "treatment": "easy_label",
       "isReplay": false
+    },
+    "bz0ve216ATZJbjDy2YTd": {
+      "rapidGuesses": 0,
+      "isReplay": false,
+      "rageClicks": 0,
+      "isSolved": true,
+      "puzzleId": "puzzle_04",
+      "attemptCount": 1,
+      "timeToFirstAttempt": 47,
+      "roundNumber": 2,
+      "didSkip": false,
+      "treatment": "easy_label",
+      "tabSwitchCount": 0,
+      "firstAnswerCorrect": true,
+      "tabSwitchTimePaused": 0,
+      "rawSubmissionTimestamps": [
+        1785065931619
+      ],
+      "timeEngaged": 47,
+      "userId": "local_u7tfossmb"
     },
     "c0dW4k8hXLw59UR6zbfd": {
       "userId": "local_l9unezb5m",
@@ -33664,6 +34385,24 @@
       "tabSwitchTimePaused": 0,
       "treatment": "no_label",
       "isReplay": false
+    },
+    "cVpt94cazpiZs57YOxUG": {
+      "rapidGuesses": 0,
+      "rageClicks": 0,
+      "firstAnswerCorrect": null,
+      "isReplay": false,
+      "userId": "local_pq26yv2bo",
+      "treatment": "hard_label",
+      "attemptCount": 0,
+      "didSkip": true,
+      "timeToFirstAttempt": null,
+      "puzzleId": "puzzle_02",
+      "timeEngaged": 84,
+      "tabSwitchCount": 0,
+      "roundNumber": 4,
+      "tabSwitchTimePaused": 0,
+      "rawSubmissionTimestamps": [],
+      "isSolved": false
     },
     "cW2LHu5ZSMz5Uc9hQX36": {
       "userId": "local_s37xas4p3",
@@ -34872,6 +35611,46 @@
       "treatment": "easy_label",
       "isReplay": false
     },
+    "eQhR9iIxmLhxrxEHmxYi": {
+      "treatment": "easy_label",
+      "tabSwitchCount": 0,
+      "firstAnswerCorrect": true,
+      "didSkip": false,
+      "rageClicks": 0,
+      "attemptCount": 1,
+      "timeEngaged": 129,
+      "roundNumber": 2,
+      "isReplay": false,
+      "puzzleId": "puzzle_02",
+      "timeToFirstAttempt": 129,
+      "tabSwitchTimePaused": 0,
+      "userId": "local_i3bxsv6vu",
+      "rapidGuesses": 0,
+      "isSolved": true,
+      "rawSubmissionTimestamps": [
+        1785173952159
+      ]
+    },
+    "eQkYy5Lg5IYwa354ZMhQ": {
+      "rageClicks": 0,
+      "rawSubmissionTimestamps": [
+        1784742974546
+      ],
+      "isSolved": true,
+      "attemptCount": 1,
+      "puzzleId": "puzzle_01",
+      "firstAnswerCorrect": true,
+      "didSkip": false,
+      "tabSwitchCount": 0,
+      "rapidGuesses": 0,
+      "timeToFirstAttempt": 256,
+      "roundNumber": 3,
+      "tabSwitchTimePaused": 0,
+      "isReplay": false,
+      "treatment": "hard_label",
+      "timeEngaged": 256,
+      "userId": "local_j4mftp5gm"
+    },
     "eVG9OvtEcmgxqB9CyaDB": {
       "userId": "local_2xwp3kg67",
       "roundNumber": 4,
@@ -35573,6 +36352,28 @@
       "tabSwitchTimePaused": 0,
       "treatment": "easy_label",
       "isReplay": false
+    },
+    "fmWjHg4pzsZYzUb4jbEv": {
+      "timeEngaged": 1141,
+      "attemptCount": 3,
+      "rawSubmissionTimestamps": [
+        1784944033167,
+        1784944143442,
+        1784944342565
+      ],
+      "firstAnswerCorrect": false,
+      "treatment": "hard_label",
+      "isSolved": false,
+      "tabSwitchTimePaused": 0,
+      "rapidGuesses": 0,
+      "timeToFirstAttempt": 830,
+      "didSkip": true,
+      "isReplay": false,
+      "tabSwitchCount": 0,
+      "roundNumber": 3,
+      "puzzleId": "puzzle_02",
+      "rageClicks": 0,
+      "userId": "local_arr7855kj"
     },
     "foEtZ7yKL7lWo7uvUUuq": {
       "userId": "local_h3kx8ie9c",
@@ -37929,6 +38730,29 @@
       "treatment": "hard_label",
       "isReplay": false
     },
+    "jkf3TkM9gL0xkHQTIWrB": {
+      "firstAnswerCorrect": false,
+      "rawSubmissionTimestamps": [
+        1785174056425,
+        1785174085613,
+        1785174129729,
+        1785174187871
+      ],
+      "rageClicks": 0,
+      "didSkip": false,
+      "userId": "local_i3bxsv6vu",
+      "tabSwitchTimePaused": 0,
+      "isReplay": false,
+      "tabSwitchCount": 0,
+      "timeToFirstAttempt": 51,
+      "treatment": "easy_label",
+      "timeEngaged": 183,
+      "roundNumber": 4,
+      "puzzleId": "puzzle_03",
+      "rapidGuesses": 0,
+      "isSolved": true,
+      "attemptCount": 4
+    },
     "jlYsTiKoTIUwiCDBBCf2": {
       "userId": "local_tcx7gfh4l",
       "roundNumber": 2,
@@ -37970,6 +38794,50 @@
       "tabSwitchCount": 0,
       "tabSwitchTimePaused": 0,
       "treatment": "easy_label",
+      "isReplay": false
+    },
+    "k00TvPqGn3X8J95NT794": {
+      "userId": "local_pq26yv2bo",
+      "rapidGuesses": 0,
+      "timeEngaged": 100,
+      "firstAnswerCorrect": false,
+      "rawSubmissionTimestamps": [
+        1784848463097,
+        1784848501217
+      ],
+      "treatment": "hard_label",
+      "tabSwitchCount": 0,
+      "isSolved": true,
+      "roundNumber": 2,
+      "timeToFirstAttempt": 62,
+      "attemptCount": 2,
+      "tabSwitchTimePaused": 0,
+      "puzzleId": "puzzle_04",
+      "rageClicks": 0,
+      "didSkip": false,
+      "isReplay": false
+    },
+    "k3KFolrN86uhiyRjQ7lj": {
+      "roundNumber": 1,
+      "attemptCount": 4,
+      "rapidGuesses": 0,
+      "isSolved": true,
+      "treatment": "hard_label",
+      "tabSwitchTimePaused": 0,
+      "rawSubmissionTimestamps": [
+        1784848222276,
+        1784848297966,
+        1784848337631,
+        1784848388630
+      ],
+      "puzzleId": "puzzle_03",
+      "tabSwitchCount": 0,
+      "rageClicks": 0,
+      "firstAnswerCorrect": false,
+      "didSkip": false,
+      "timeEngaged": 238,
+      "timeToFirstAttempt": 71,
+      "userId": "local_pq26yv2bo",
       "isReplay": false
     },
     "k6WPTkXYskpXI89LZCdo": {
@@ -39029,6 +39897,26 @@
       "treatment": "hard_label",
       "isReplay": false
     },
+    "lv9bxs1ecAqdixKf1w2Y": {
+      "rapidGuesses": 0,
+      "tabSwitchCount": 0,
+      "roundNumber": 2,
+      "attemptCount": 1,
+      "timeToFirstAttempt": 62,
+      "userId": "local_arr7855kj",
+      "timeEngaged": 62,
+      "isSolved": true,
+      "isReplay": false,
+      "tabSwitchTimePaused": 0,
+      "didSkip": false,
+      "puzzleId": "puzzle_03",
+      "rageClicks": 0,
+      "rawSubmissionTimestamps": [
+        1784943190881
+      ],
+      "firstAnswerCorrect": true,
+      "treatment": "hard_label"
+    },
     "lvyENffW2K64BqvYXKMi": {
       "userId": "local_md904uuo6",
       "roundNumber": 5,
@@ -39113,6 +40001,31 @@
       "tabSwitchTimePaused": 0,
       "treatment": "no_label",
       "isReplay": false
+    },
+    "m7aq05gY9cIUbkvqVN65": {
+      "tabSwitchCount": 0,
+      "rageClicks": 12,
+      "rawSubmissionTimestamps": [
+        1785144169813,
+        1785144180492,
+        1785144182617,
+        1785144184582,
+        1785144187217,
+        1785144191796
+      ],
+      "isReplay": false,
+      "rapidGuesses": 1,
+      "treatment": "no_label",
+      "userId": "local_m81ra0zrn",
+      "puzzleId": "puzzle_01",
+      "didSkip": true,
+      "isSolved": false,
+      "roundNumber": 3,
+      "firstAnswerCorrect": false,
+      "tabSwitchTimePaused": 0,
+      "timeToFirstAttempt": 95,
+      "attemptCount": 6,
+      "timeEngaged": 123
     },
     "m8pyeObP8i7CmjNjKRZR": {
       "userId": "local_lem1mrk8f",
@@ -39317,6 +40230,59 @@
       "treatment": "hard_label",
       "isReplay": false
     },
+    "mX76kLxKSZfprBHVwjTj": {
+      "rawSubmissionTimestamps": [
+        1784740694976,
+        1784741114943,
+        1784741281023,
+        1784741546384,
+        1784741594095,
+        1784741770827,
+        1784741873068,
+        1784741922727,
+        1784742109604,
+        1784742231888,
+        1784742292557,
+        1784742403817,
+        1784742509918,
+        1784742614317
+      ],
+      "timeEngaged": 2002,
+      "timeToFirstAttempt": 127,
+      "puzzleId": "puzzle_02",
+      "attemptCount": 14,
+      "roundNumber": 1,
+      "userId": "local_j4mftp5gm",
+      "didSkip": false,
+      "rageClicks": 0,
+      "isSolved": true,
+      "firstAnswerCorrect": false,
+      "rapidGuesses": 0,
+      "treatment": "hard_label",
+      "tabSwitchTimePaused": 43.34,
+      "tabSwitchCount": 4,
+      "isReplay": false
+    },
+    "mXcpJhbp130sUz8eJQEc": {
+      "treatment": "no_label",
+      "isSolved": true,
+      "rawSubmissionTimestamps": [
+        1785144279808
+      ],
+      "roundNumber": 5,
+      "timeEngaged": 49,
+      "rapidGuesses": 0,
+      "didSkip": false,
+      "tabSwitchTimePaused": 0,
+      "puzzleId": "puzzle_03",
+      "rageClicks": 0,
+      "timeToFirstAttempt": 49,
+      "isReplay": false,
+      "userId": "local_m81ra0zrn",
+      "attemptCount": 1,
+      "tabSwitchCount": 0,
+      "firstAnswerCorrect": true
+    },
     "mXjy7HGhvAuDVCWElpNm": {
       "userId": "local_kg6mpws0h",
       "roundNumber": 4,
@@ -39483,6 +40449,22 @@
       "tabSwitchTimePaused": 73.4,
       "treatment": "easy_label",
       "isReplay": false
+    },
+    "mphuBbe3K1oaW9UVVLBQ": {
+      "userId": "local_qqwaaip6r",
+      "roundNumber": 1,
+      "puzzleId": "puzzle_05",
+      "timeEngaged": 5,
+      "isSolved": false,
+      "didSkip": false,
+      "attemptCount": 0,
+      "rageClicks": 0,
+      "rapidGuesses": 0,
+      "rawSubmissionTimestamps": [],
+      "tabSwitchCount": 0,
+      "tabSwitchTimePaused": 0,
+      "treatment": "no_label",
+      "isReplay": true
     },
     "mpu6JvPCpLLS4wCYWjNj": {
       "userId": "local_c6tqtbwh0",
@@ -40192,6 +41174,26 @@
       "treatment": "easy_label",
       "isReplay": false
     },
+    "oBMT2BO5zDtsFvYHp2iF": {
+      "rawSubmissionTimestamps": [
+        1785173810381
+      ],
+      "treatment": "easy_label",
+      "tabSwitchCount": 0,
+      "rapidGuesses": 0,
+      "puzzleId": "puzzle_05",
+      "didSkip": false,
+      "userId": "local_i3bxsv6vu",
+      "rageClicks": 0,
+      "isSolved": true,
+      "attemptCount": 1,
+      "tabSwitchTimePaused": 0,
+      "timeToFirstAttempt": 21,
+      "isReplay": false,
+      "firstAnswerCorrect": true,
+      "timeEngaged": 21,
+      "roundNumber": 1
+    },
     "oC2V5hnDjyxgrOxvA4Hp": {
       "userId": "local_fv83vfi1j",
       "roundNumber": 5,
@@ -40549,6 +41551,24 @@
       "treatment": "easy_label",
       "isReplay": false
     },
+    "ojF8UeOqygJGIfBn7dCc": {
+      "timeToFirstAttempt": null,
+      "treatment": "no_label",
+      "rageClicks": 0,
+      "puzzleId": "puzzle_05",
+      "isReplay": false,
+      "rawSubmissionTimestamps": [],
+      "didSkip": true,
+      "userId": "local_m81ra0zrn",
+      "attemptCount": 0,
+      "tabSwitchTimePaused": 0,
+      "tabSwitchCount": 0,
+      "timeEngaged": 33,
+      "rapidGuesses": 0,
+      "roundNumber": 1,
+      "isSolved": false,
+      "firstAnswerCorrect": null
+    },
     "ojYvBdLMCgLCOFdFYaT0": {
       "userId": "local_zpslxyrp4",
       "roundNumber": 4,
@@ -40700,6 +41720,24 @@
       "tabSwitchTimePaused": 0,
       "treatment": "no_label",
       "isReplay": false
+    },
+    "oxghKjwtVRaBbycuQs2I": {
+      "timeToFirstAttempt": null,
+      "treatment": "hard_label",
+      "attemptCount": 0,
+      "rageClicks": 0,
+      "didSkip": true,
+      "tabSwitchCount": 0,
+      "userId": "local_pq26yv2bo",
+      "tabSwitchTimePaused": 0,
+      "isReplay": false,
+      "rawSubmissionTimestamps": [],
+      "rapidGuesses": 0,
+      "isSolved": false,
+      "firstAnswerCorrect": null,
+      "puzzleId": "puzzle_01",
+      "timeEngaged": 169,
+      "roundNumber": 3
     },
     "p6tnoTUhIjCU1RqNLYTW": {
       "userId": "local_3xcv7oa00",
@@ -42783,6 +43821,26 @@
       "treatment": "easy_label",
       "isReplay": false
     },
+    "sN18lEB1upHcsFNPz4hN": {
+      "roundNumber": 4,
+      "tabSwitchCount": 0,
+      "rapidGuesses": 0,
+      "timeToFirstAttempt": 17,
+      "firstAnswerCorrect": true,
+      "didSkip": false,
+      "attemptCount": 1,
+      "puzzleId": "puzzle_04",
+      "isSolved": true,
+      "rawSubmissionTimestamps": [
+        1784743004065
+      ],
+      "rageClicks": 0,
+      "userId": "local_j4mftp5gm",
+      "timeEngaged": 17,
+      "treatment": "hard_label",
+      "isReplay": false,
+      "tabSwitchTimePaused": 0
+    },
     "sT2W5vNeWHZfnhYcM0fD": {
       "userId": "local_g1kb37le4",
       "roundNumber": 1,
@@ -43925,6 +44983,24 @@
       "treatment": "easy_label",
       "isReplay": false
     },
+    "vEW02fg8mgvWux9tz2tW": {
+      "userId": "local_l3fplqjxe",
+      "roundNumber": 2,
+      "puzzleId": "puzzle_01",
+      "timeEngaged": 76,
+      "isSolved": false,
+      "didSkip": true,
+      "attemptCount": 0,
+      "firstAnswerCorrect": null,
+      "timeToFirstAttempt": null,
+      "rageClicks": 0,
+      "rapidGuesses": 0,
+      "rawSubmissionTimestamps": [],
+      "tabSwitchCount": 0,
+      "tabSwitchTimePaused": 0,
+      "treatment": "easy_label",
+      "isReplay": false
+    },
     "vEfSoOknPnJuRBVwVfUi": {
       "userId": "local_jpmmzvb8t",
       "roundNumber": 3,
@@ -44799,6 +45875,30 @@
       "treatment": "no_label",
       "isReplay": false
     },
+    "wJXufUqfd9guFFM0NhpP": {
+      "isReplay": false,
+      "treatment": "no_label",
+      "puzzleId": "puzzle_02",
+      "timeEngaged": 163,
+      "attemptCount": 5,
+      "timeToFirstAttempt": 36,
+      "userId": "local_m81ra0zrn",
+      "rawSubmissionTimestamps": [
+        1785143937031,
+        1785143939441,
+        1785143941532,
+        1785143998555,
+        1785144061660
+      ],
+      "firstAnswerCorrect": false,
+      "roundNumber": 2,
+      "rageClicks": 0,
+      "tabSwitchTimePaused": 0,
+      "isSolved": false,
+      "tabSwitchCount": 0,
+      "didSkip": true,
+      "rapidGuesses": 1
+    },
     "wQMYwhxkt9YEwzolNDUj": {
       "userId": "local_h1i1lq79a",
       "roundNumber": 5,
@@ -44915,6 +46015,26 @@
       "tabSwitchTimePaused": 0,
       "treatment": "easy_label",
       "isReplay": false
+    },
+    "wZXQRmhJwtQCaXgTaOeq": {
+      "treatment": "easy_label",
+      "isSolved": true,
+      "timeToFirstAttempt": 199,
+      "puzzleId": "puzzle_03",
+      "firstAnswerCorrect": true,
+      "tabSwitchCount": 0,
+      "rageClicks": 0,
+      "didSkip": false,
+      "isReplay": false,
+      "timeEngaged": 199,
+      "userId": "local_u7tfossmb",
+      "tabSwitchTimePaused": 0,
+      "attemptCount": 1,
+      "rapidGuesses": 0,
+      "rawSubmissionTimestamps": [
+        1785066458924
+      ],
+      "roundNumber": 4
     },
     "waZVpQxQbpM1UxP9U341": {
       "userId": "local_hlmj3kx6h",
@@ -46645,6 +47765,27 @@
       "tabSwitchTimePaused": 90.9,
       "treatment": "hard_label",
       "isReplay": false
+    },
+    "zRgD70F6pVJqWi4ppt65": {
+      "isReplay": false,
+      "isSolved": true,
+      "attemptCount": 2,
+      "rageClicks": 0,
+      "roundNumber": 1,
+      "userId": "local_arr7855kj",
+      "rawSubmissionTimestamps": [
+        1784943087132,
+        1784943115738
+      ],
+      "timeEngaged": 58,
+      "didSkip": false,
+      "tabSwitchTimePaused": 0,
+      "firstAnswerCorrect": false,
+      "treatment": "hard_label",
+      "rapidGuesses": 0,
+      "timeToFirstAttempt": 30,
+      "puzzleId": "puzzle_04",
+      "tabSwitchCount": 0
     },
     "zRoWLavfNDcFZOfxu5tB": {
       "userId": "local_9b8flazne",

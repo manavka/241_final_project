@@ -1317,7 +1317,7 @@ appropriate.
 
 Since our outcome variable, attempt count, is an integer count,
 traditional linear models are not appropriate. The variance is much
-larger of our than the mean, (`r var_att`\>\>`r mean_at`), and there is
+larger of our than the mean, (`r var_att`\>\>`r mean_att`), and there is
 no zero inflation, (proportion of zeroes is `r prop_of_zero`). Given
 these facts, negative Binomial regression is most suited for this task.
 It is not mathematically possible to use a negative binomial regression
@@ -1344,7 +1344,7 @@ E[\text{attemptCount}_i] =
   + \beta_3\,\text{puzzleSkill}_i
   + \beta_4\,\text{source}_i
   + \beta_5\,\text{age}_i
-  + \beta_6\,\text{quantitativeExposure}_i
+  + \beta_6\,\text{quantitativeExposure}_i \\
   + \beta_7\,\text{energyLevel}_i
   + \beta_8\,\text{deviceType}_i
 \Big)
@@ -1513,33 +1513,8 @@ eliciting substantially more attempts than others. These findings
 indicate that puzzle‑specific features, rather than externally assigned
 difficulty labels, shape participant behavior in this task.
 
-```{r fig-coef, fig.width=5, fig.height=2.5, fig.pos="H", fig.align="center", out.width="0.65\\textwidth", fig.cap="Point estimates and 95\\% confidence intervals for the effect of difficulty labels on log time engaged relative to the no label control. Error bars are based on cluster-robust standard errors."}
-coef_df <- data.frame(
-  term = c("Easy Label", "Hard Label"),
-  est  = c(rt$beta[rt$Coef == "treatmenteasy_label"],
-           rt$beta[rt$Coef == "treatmenthard_label"]),
-  se   = c(rt$SE[rt$Coef == "treatmenteasy_label"],
-           rt$SE[rt$Coef == "treatmenthard_label"])
-) %>%
-  mutate(lo = est - 1.96 * se, hi = est + 1.96 * se)
 
-ggplot(coef_df, aes(x = est, y = term)) +
-  geom_vline(xintercept = 0, linetype = "dashed", color = "gray50") +
-  geom_errorbar(aes(xmin = lo, xmax = hi), width = 0.15) +
-  geom_point(size = 3) +
-  labs(x = "Estimated Effect on Log Time Engaged", y = NULL,
-       title    = "Effect of Difficulty Labels on Engagement",
-       subtitle = "Relative to no-label control; error bars are 95% CIs") +
-  theme_bw(base_size = 9)
-```
-
-As shown in Figure \@ref(fig:fig-coef), the confidence intervals for
-both estimates are wide and cross zero, so we can't say much about the
-true direction of either effect. H3 is also not supported — the hard
-label point estimate is actually below the easy label estimate, the
-opposite of what we predicted.
-
-##Appendix
+## Appendix
 
 ### A. Residual Diagnostics
 
