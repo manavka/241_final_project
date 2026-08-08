@@ -701,7 +701,7 @@ differences between arms. The Prolific subsample had zero dropout across
 all three arms, which was expected given that Prolific participants are
 paid to complete studies (see Table \@ref(tab:tab-attrition)).
 
-## Completer Analysis & Covariate Balance
+### Completer Analysis & Covariate Balance
 
 The primary analysis estimates average treatment effects among the 256
 participants who completed all five rounds. Restricting to completers
@@ -964,7 +964,145 @@ true direction of either effect. H3 is also not supported — the hard
 label point estimate is actually below the easy label estimate, the
 opposite of what we predicted.
 
+#### Attrition Sensitivity Analysis
+
+To assess how sensitive the primary estimates are to attrition, we
+compare four versions of the model. The first is the completer analysis
+above. The second includes all observed rounds from partial completer,
+or participants who started but did not finish all five rounds and using
+only the rounds they actually completed. The third and fourth impute
+attritors' unobserved rounds with the minimum and maximum observed logTE
+respectively, bounding the range of plausible true effects.
+
+```{r tab-bounds, results="asis", message=FALSE, warning=FALSE}
+# Group-specific min/max logTE from completers
+group_bounds <- df %>%
+  group_by(treatment) %>%
+  summarize(min_logTE = min(logTE, na.rm = TRUE),
+            max_logTE = max(logTE, na.rm = TRUE), .groups = "drop")
+
+# All observed rounds including partial completers
+df_partial <- master %>%
+  filter(source %in% c("Prolific", "Organic")) %>%
+  mutate(
+    logTE      = log(timeEngaged + 1),
+    treatment  = relevel(factor(treatment), ref = "no_label"),
+    puzzleId   = relevel(factor(puzzleId),  ref = "puzzle_01"),
+    deviceType = factor(deviceType)
+  )
+
+# Pessimistic imputation: fill unobserved rounds for attritors
+attritor_ids <- master %>%
+  filter(sessionComplete == FALSE) %>%
+  distinct(userId) %>%
+  pull(userId)
+
+observed_puzzles <- master %>%
+  dplyr::select(userId, puzzleId)
+
+all_puzzles <- expand.grid(
+  userId   = attritor_ids,
+  puzzleId = unique(master$puzzleId),
+  stringsAsFactors = FALSE
+)
+
+missing_rounds_base <- all_puzzles %>%
+  anti_join(observed_puzzles, by = c("userId", "puzzleId")) %>%
+  left_join(master %>% distinct(userId, treatment, source, puzzleSkill,
+                                age, quantitativeExposure, energyLevel,
+                                deviceType),
+            by = "userId") %>%
+  left_join(group_bounds, by = "treatment")
+
+df_pessimistic <- bind_rows(df_partial,
+                            missing_rounds_base %>% mutate(logTE = min_logTE) %>%
+                              dplyr::select(-min_logTE, -max_logTE)) %>%
+  mutate(
+    treatment  = relevel(factor(treatment), ref = "no_label"),
+    puzzleId   = relevel(factor(puzzleId),  ref = "puzzle_01"),
+    deviceType = factor(deviceType)
+  )
+
+df_optimistic <- bind_rows(df_partial,
+                           missing_rounds_base %>% mutate(logTE = max_logTE) %>%
+                             dplyr::select(-min_logTE, -max_logTE)) %>%
+  mutate(
+    treatment  = relevel(factor(treatment), ref = "no_label"),
+    puzzleId   = relevel(factor(puzzleId),  ref = "puzzle_01"),
+    deviceType = factor(deviceType)
+  )
+
+fit_bounds <- function(data) {
+  m  <- lmer(logTE ~ treatment + puzzleId + puzzleSkill + source +
+               age + quantitativeExposure + energyLevel + deviceType + (1 | userId),
+             data = data, REML = FALSE)
+  vc <- vcovCR(m, cluster = data$userId, type = "CR1")
+  list(m = m, vc = vc)
+}
+
+b_comp    <- fit_bounds(df)
+b_partial <- fit_bounds(df_partial)
+b_pess    <- fit_bounds(df_pessimistic)
+b_opt     <- fit_bounds(df_optimistic)
+
+modelsummary(
+  list("Completers Only" = b_comp$m, "Partial Completers" = b_partial$m,
+       "Worst-Case Bound" = b_pess$m, "Best-Case Bound" = b_opt$m),
+  vcov      = list(b_comp$vc, b_partial$vc, b_pess$vc, b_opt$vc),
+  statistic = c("({std.error})", "p = {p.value}"),
+  coef_map  = c("treatmenteasy_label" = "Easy Label",
+                "treatmenthard_label" = "Hard Label"),
+  gof_omit  = ".*",
+  stars     = c("*" = 0.1, "**" = 0.05, "***" = 0.01),
+  title     = "Attrition Sensitivity: Primary Model Under Three Samples",
+  booktabs  = TRUE,
+  escape    = FALSE,
+  output    = "kableExtra"
+) %>%
+  kable_styling(latex_options = c("hold_position", "scale_down"), font_size = 9) %>%
+  footnote(general = "Mixed-effects model (lmer); cluster-robust SEs (CR1) by participant. Worst-case and best-case bounds impute attritors' unobserved rounds using the minimum and maximum observed logTE within each treatment arm.",
+           threeparttable = TRUE, escape = FALSE)
+```
+
+```{r bounds-vals, include=FALSE}
+get_b <- function(fit, coef) round(coef_test(fit$m, vcov = fit$vc, test = "Satterthwaite") %>%
+  filter(Coef == coef) %>% pull(beta), 3)
+get_p <- function(fit, coef) round(coef_test(fit$m, vcov = fit$vc, test = "Satterthwaite") %>%
+  filter(Coef == coef) %>% pull(p_Satt), 3)
+
+bounds_easy_comp  <- get_b(b_comp,    "treatmenteasy_label")
+bounds_hard_comp  <- get_b(b_comp,    "treatmenthard_label")
+bounds_hard_part  <- get_b(b_partial, "treatmenthard_label")
+bounds_hard_pess  <- get_b(b_pess,    "treatmenthard_label")
+bounds_hard_opt   <- get_b(b_opt,     "treatmenthard_label")
+bounds_hard_opt_p <- get_p(b_opt,     "treatmenthard_label")
+```
+
+The easy label is near zero in all four scenarios, so the null there is
+not sensitive to attrition assumptions. The hard label is more
+consistent than the overall bounds suggested: the negative direction
+holds across all four scenarios, ranging from `r bounds_hard_pess` under
+the worst-case bound to `r bounds_hard_comp` among completers. The
+estimate attenuates when partial completers are added
+(`r bounds_hard_part`) but stays close to the completer estimate under
+the best-case bound (`r bounds_hard_opt`, p = `r bounds_hard_opt_p`).
+Using group-specific bounds, the hard label effect does not disappear
+under any scenario — it just loses significance. This gives slightly
+more confidence that the direction is real, though the effect remains
+too imprecisely estimated to draw strong conclusions.
+
 ### Secondary Model: Effect of Difficulty Labels on Zero-Attempt Skips
+
+Log time engaged captures how long someone stayed on a puzzle, but it
+doesn't distinguish between someone who tried hard and gave up versus
+someone who looked at the puzzle and immediately skipped without
+entering anything. A zero-attempt skip — where a participant skips
+without submitting any answer — is an alternative signal of
+disengagement. If difficulty labels affect how willing people are to
+even try, we would expect to see it here. We look at this as a secondary
+outcome because it captures a different behavioral channel than time
+engaged and may be more sensitive to the framing effect, particularly
+among participants who are paying attention to the label.
 
 ```{r tab-skip-rate}
 skip_by_puzzle <- df %>%
@@ -1131,7 +1269,7 @@ effect. In short, the easy label appears to work by making cold-skipping
 feel less acceptable, but that mechanism requires the participant to be
 paying attention to the framing in the first place.
 
-### Secondary Model: Effect of Difficulty Labels on Time Before Skipping
+### Exploratory Model: Effect of Difficulty Labels on Time Before Skipping
 
 #### Outcome Description
 
@@ -1312,8 +1450,7 @@ indicating overdispersion.
 ```{r fig-log-justification-ATT-COUNT, fig.width=5, fig.height=3.5, fig.cap="Distribution of attempt count per puzzle round. The distribution is right-skewed with most participants making few attempts and a sparse tail of high-attempt rounds.", fig.pos="H", out.width="0.65\\textwidth", fig.align="center"}
 ggplot(df, aes(x = attemptCount)) +
   geom_histogram(bins = 20, fill = "steelblue", color = "white") +
-  labs(x = "Attempt Count", y = "Count", title = "Attempt Count Distribution") +
-  theme_bw(base_size = 9)
+  labs(x = "Attempt Count", y = "Count", title = "Attempt Count Distribution")
 ```
 
 #### Model Specification
@@ -1520,11 +1657,4 @@ power. It would also be worth testing whether the effect depends on the
 mismatch itself, specifically whether an easy label on a genuinely easy
 puzzle produces a different response than an easy label on a hard one.
 
-## Appendix
-
-### A. Residual Diagnostics
-
-```{r fig-qq, fig.width=5, fig.height=5, fig.pos="H", fig.cap="Normal Q-Q plot of residuals from the primary model (log time engaged ~ difficulty label + puzzle fixed effects + covariates + participant random intercept). Residuals track the reference line closely across the central range, with minor deviation in the lower tail, consistent with a light left tail after log transformation."}
-qqnorm(residuals(m), main = "Normal Q-Q Plot of Model Residuals")
-qqline(residuals(m), col = "steelblue")
-```
+## References
