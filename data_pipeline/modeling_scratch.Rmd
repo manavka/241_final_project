@@ -164,6 +164,37 @@ df_hard_skip %>%
   kable(caption = "Raw means — avg attempts before skip on hard puzzles")
 ```
 
+## Exploratory: logTE ~ treatment × puzzleId
+
+Does the treatment effect on engagement vary by puzzle?
+
+```{r interaction-puzzle}
+m_int <- lmer(logTE ~ treatment * puzzleId + puzzleSkill + source +
+                age + quantitativeExposure + energyLevel + deviceType + (1 | userId),
+              data = df, REML = FALSE)
+
+vcov_int <- vcovCR(m_int, cluster = df$userId, type = "CR1")
+rt_int   <- coef_test(m_int, vcov = vcov_int, test = "Satterthwaite")
+
+# Pull interaction rows only
+rt_int %>%
+  filter(grepl("treatment.*puzzleId|puzzleId.*treatment", Coef)) %>%
+  mutate(
+    across(c(beta, SE, tstat), ~ round(., 3)),
+    p_Satt = round(p_Satt, 4)
+  ) %>%
+  select(Coef, beta, SE, tstat, p_Satt) %>%
+  kable(caption = "treatment × puzzleId interactions (cluster-robust SEs)")
+
+# Marginal means: predicted logTE per treatment × puzzle cell
+library(emmeans)
+emm <- emmeans(m_int, ~ treatment * puzzleId)
+as.data.frame(emm) %>%
+  mutate(across(c(emmean, SE, lower.CL, upper.CL), ~ round(., 3))) %>%
+  arrange(puzzleId, treatment) %>%
+  kable(caption = "Marginal means: logTE by treatment × puzzle")
+```
+
 ## Robustness: Overall Skip Rate & Solve Rate
 
 ```{r robustness-models}

@@ -21,6 +21,7 @@ knitr::opts_chunk$set(echo = FALSE, warning = TRUE, message = TRUE, error = TRUE
 ```
 
 ```{r load-data, include=FALSE}
+library(MASS)
 library(dplyr)
 library(tidyr)
 library(purrr)
@@ -35,7 +36,6 @@ library(consort)
 library(ggplot2)
 library(patchwork)
 library(stargazer)
-library(MASS)
 library(lmtest)
 library(margins)
 master      <- readRDS("analysis_data.rds")
@@ -304,7 +304,7 @@ df %>%
   arrange(desc(overall_raw)) %>%
   mutate(across(c(no_label, easy_label, hard_label, overall_raw),
                 ~ paste0(round(. * 100, 1), "%"))) %>%
-  select(Puzzle, no_label, easy_label, hard_label, overall_raw) %>%
+  dplyr::select(Puzzle, no_label, easy_label, hard_label, overall_raw) %>%
   rename(
     `No Label`   = no_label,
     `Easy Label` = easy_label,
@@ -665,7 +665,7 @@ attrition_tbl %>%
     )
   ) %>%
   arrange(source, treatment) %>%
-  select(-source) %>%
+  dplyr::select(-source) %>%
   rename(
     Treatment      = treatment,
     `N Started`    = n_started,
@@ -852,12 +852,13 @@ We estimated the effect of difficulty labels on log time engaged using a
 linear mixed-effects model with puzzle fixed effects, a
 participant-level random intercept, and pre-treatment covariates:
 
-$$\log(\text{TimeEngaged}_{it}) = \beta_0 + \beta_1 \text{EasyLabel}_i + \beta_2 \text{HardLabel}_i + \mathbf{X}_i'\boldsymbol{\delta} + \varepsilon_{it}$$
+$$\log(\text{TimeEngaged}_{it}) = \beta_0 + \beta_1 \text{EasyLabel}_i + \beta_2 \text{HardLabel}_i + \mathbf{X}i'\boldsymbol{\delta} + u_i + \varepsilon_{it}$$
 
-where $\mathbf{X}_i$ includes puzzle skill, recruitment source, age,
-quantitative exposure, energy level, and device type. Standard errors
-are clustered at the participant level using CR1 with Satterthwaite
-degrees of freedom.
+where $u_i \sim N(0, \sigma_u^2)$ is the participant-level random
+intercept and $\mathbf{X}_i$ includes puzzle skill, recruitment source,
+age, quantitative exposure, energy level, and device type. Standard
+errors are clustered at the participant level using CR1 with
+Satterthwaite degrees of freedom.
 
 ```{r primary-model, message=FALSE, warning=FALSE}
 # Full sample (controls for source)
@@ -965,12 +966,6 @@ opposite of what we predicted.
 
 ### Secondary Model: Effect of Difficulty Labels on Zero-Attempt Skips
 
-#### Outcome Description
-
-The secondary outcome is zero-attempt skips — rounds where a participant
-skipped without entering any response, regardless of how much time or
-cognitive effort preceded that decision.
-
 ```{r tab-skip-rate}
 skip_by_puzzle <- df %>%
   mutate(puzzle = case_when(
@@ -1003,9 +998,12 @@ bind_rows(skip_by_puzzle, overall) %>%
 
 #### Model Specification
 
-We model zero-attempt skips using a Linear Probability Model (LPM),
-estimating the probability of a zero-attempt skip as a linear function
-of treatment assignment and covariates:
+The secondary outcome is zero-attempt skips — rounds where a participant
+skipped without entering any response, regardless of how much time or
+cognitive effort preceded that decision. We model zero-attempt skips
+using a Linear Probability Model (LPM), estimating the probability of a
+zero-attempt skip as a linear function of treatment assignment and
+covariates:
 
 $$\text{ZeroAttSkip}_{it} = \beta_0 + \beta_1 \text{EasyLabel}_i + \beta_2 \text{HardLabel}_i + \mathbf{X}_i'\boldsymbol{\delta} + \varepsilon_{it}$$
 
@@ -1287,68 +1285,65 @@ stargazer(
 )
 ```
 
-## Secondary Model: Effect of Difficulty Labels on Attempt Count
+### Exploratory Model: Effect of Difficulty Labels on Attempt Count
+
+Given that the primary outcome showed no significant treatment effect,
+we explored whether difficulty labels influenced participant behavior
+through a different channel — how hard they tried before giving up. This
+analysis is exploratory and not intended to support causal claims.
 
 #### Outcome Distribution
 
-```{r fig-log-justification-ATT-COUNT, fig.width=8, fig.height=3.5, fig.cap="Distribution of Attempt Count Before and After Log Transformation.", fig.pos="H", out.width="\\textwidth"}
-m1_raw <- ggplot(df, aes(x = attemptCount)) +
-  geom_histogram(bins = 20, fill = "steelblue", color = "white") +
-  labs(x = "Attempt Count", y = "Count", title = "Attempt Count Distribution")
-m1_raw
-
-summary(df$attemptCount)
-mean_att<-mean(df$attemptCount)
-var_att<-var(df$attemptCount)
-num_zero_att<-sum((df$attemptCount)==0)
-num_responses_att<-length(df$attemptCount)
-prop_of_zero<-num_zero_att/num_responses_att
-
+```{r att-count-stats, include=FALSE}
+mean_att          <- mean(df$attemptCount)
+var_att           <- var(df$attemptCount)
+num_zero_att      <- sum(df$attemptCount == 0)
+num_responses_att <- length(df$attemptCount)
+prop_of_zero      <- num_zero_att / num_responses_att
 ```
 
-Attempt count records the number of attempts made on a question before
-getting the correct answer of skipping. Raw attempt count is strongly
-right-skewed, with a sparse tail from the few participants who made many
-attempts on a single puzzle. This is a count variable that only takes
-integer values. This suggests that a traditional linear model is not
-appropriate.
+Attempt count measures how many answers a participant submitted before
+either solving the puzzle or skipping it. Most participants make only a
+few attempts, but a small number make many, producing a right-skewed
+distribution with a mean of `r round(mean_att, 1)` attempts per round
+and a variance of `r round(var_att, 1)` — well above the mean,
+indicating overdispersion.
+
+```{r fig-log-justification-ATT-COUNT, fig.width=5, fig.height=3.5, fig.cap="Distribution of attempt count per puzzle round. The distribution is right-skewed with most participants making few attempts and a sparse tail of high-attempt rounds.", fig.pos="H", out.width="0.65\\textwidth", fig.align="center"}
+ggplot(df, aes(x = attemptCount)) +
+  geom_histogram(bins = 20, fill = "steelblue", color = "white") +
+  labs(x = "Attempt Count", y = "Count", title = "Attempt Count Distribution") +
+  theme_bw(base_size = 9)
+```
 
 #### Model Specification
 
-Since our outcome variable, attempt count, is an integer count,
-traditional linear models are not appropriate. The variance is much
-larger of our than the mean, (`r var_att`\>\>`r mean_att`), and there is
-no zero inflation, (proportion of zeroes is `r prop_of_zero`). Given
-these facts, negative Binomial regression is most suited for this task.
-It is not mathematically possible to use a negative binomial regression
-model and with cluster robust SEs and a participant level random
-baseline. If we include userId as a factor, the model estimates a
-separate intercept for each user (factor(userId)) plus a treatment
-effect that is constant within each user we elected to use participant
-as a factor so we can still use clustered robust SE Since treatment is
-perfectly determined by user (each user has only one treatment), the
-model is effectively trying to estimate one dummy per user plus a dummy
-for treatment that is just a relabeling of users which leads to
-perfect/near-perfect collinearity. This means the treatment effect will
-not be correctly identified. This leads us to drop the userId covariate
-entirely. We estimated the effect of difficulty labels on log time
-engaged using a negative binomial model with puzzle fixed effects and
-pre-treatment covariates:
+Attempt count is a non-negative integer with variance
+(`r round(var_att, 1)`) much larger than the mean
+(`r round(mean_att, 1)`), which rules out a Poisson model and points to
+negative binomial regression. Zero inflation is not a concern —
+`r round(prop_of_zero * 100, 1)`% of rounds have zero attempts, which is
+consistent with natural count variation rather than a separate
+zero-generating process.
 
-$$
-E[\text{attemptCount}_i] =
-\exp\!\Big(
-  \beta_0
-  + \beta_1\,\text{treatment}_i
-  + \beta_2\,\text{puzzleId}_i
-  + \beta_3\,\text{puzzleSkill}_i
-  + \beta_4\,\text{source}_i
-  + \beta_5\,\text{age}_i
-  + \beta_6\,\text{quantitativeExposure}_i \\
-  + \beta_7\,\text{energyLevel}_i
-  + \beta_8\,\text{deviceType}_i
-\Big)
-$$
+Adding a participant-level random intercept is not feasible here. A
+mixed-effects negative binomial model (glmer.nb) would be the natural
+extension, but cluster-robust variance estimation is not supported for
+mixed-effects models of this class in the software used. As an
+alternative, we considered including participant as a fixed effect, but
+since each participant is assigned to exactly one treatment arm,
+participant dummies are perfectly collinear with treatment, making the
+treatment effect unidentifiable. We therefore drop the random intercept
+entirely and cluster standard errors at the participant level to account
+for within-person correlation.
+
+$$E[\text{attemptCount}_{it}] = \exp\!\Big(\beta_0 + \beta_1\,\text{EasyLabel}_i + \beta_2\,\text{HardLabel}_i + \boldsymbol{\gamma}_t + \mathbf{X}_i'\boldsymbol{\delta}\Big)$$
+
+where $\boldsymbol{\gamma}_t$ are puzzle fixed effects and
+$\mathbf{X}_i$ includes puzzle skill, age, quantitative exposure, energy
+level, and device type. The full-sample model additionally controls for
+recruitment source. Coefficients are interpreted as multiplicative
+effects on expected attempt count.
 
 ```{r attcount-model, message=FALSE, warning=FALSE}
 
@@ -1361,9 +1356,6 @@ m_nb <- glm.nb(
 
 vcov_m <- vcovCL(m_nb, cluster = df$userId)
 rt<-coeftest(m_nb, vcov = vcov_m)
-
-
-
 
 
 # Organic subsample
@@ -1401,11 +1393,12 @@ modelsummary(
   stars     = c("*" = 0.1, "**" = 0.05, "***" = 0.01),
   title     = "Effect of Difficulty Labels on Attempt Count",
   booktabs  = TRUE,
+  escape    = FALSE,
   output    = "kableExtra"
 ) %>%
   kable_styling(latex_options = c("hold_position", "scale_down"), font_size = 9) %>%
-  footnote(general = "negative binomial model; cluster-robust SEs (CR1) by participant.",
-           threeparttable = TRUE)
+  footnote(general = "Negative binomial model; cluster-robust SEs (HC1) by participant.",
+           threeparttable = TRUE, escape = FALSE)
 ```
 
 ```{r attcount-vals, include=FALSE}
@@ -1447,13 +1440,9 @@ m1_puz4_b_full  <- round(rt[6], 3)
 m1_puz4_b_pro  <- round(rt_pro[6], 3)
 m1_puz4_b_org  <- round(rt_org[6], 3)
 
-
 m1_puz5_b_full  <- round(rt[7], 3)
 m1_puz5_b_pro  <- round(rt_pro[7], 3)
 m1_puz5_b_org  <- round(rt_org[7], 3)
-
-
-
 
 m1_puz3_b_pro  
 m1_puz3_se_pro
@@ -1463,63 +1452,73 @@ round(exp(m1_puz3_b_pro),3)
 round(exp(m1_puz3_b_org),3)
 ```
 
-We estimated Negative Binomial regression models to evaluate whether
-assigning difficulty labels (“Easy” or “Hard”) influences the number of
-attempts participants make on each puzzle. Models were fit separately
-for the full sample, organically recruited participants, and
-participants recruited through Prolific. All models include controls for
-puzzle identity, puzzle skill rating, source, age, quantitative
-exposure, energy level, and device type. Standard errors are clustered
-by participant to account for repeated observations.
+Neither label had a statistically significant effect on attempt count
+across any of the three samples. Coefficients for easy and hard labels
+are small with wide standard errors, indicating that difficulty labels
+did not change how many times participants tried before solving or
+skipping.
 
-**Difficulty Label Effects**: Across all three samples, neither the Easy
-Label nor the Hard Label produced statistically detectable changes in
-attempt count relative to the Unlabeled baseline condition. Coefficients
-for both labels are small in magnitude and accompanied by large standard
-errors, indicating substantial uncertainty around the estimated effects.
-Assigning puzzles an Easy or Hard difficulty label did not meaningfully
-alter how many attempts participants made.
-
-**Puzzle Effects**: Puzzle identity shows consistent and substantial
-associations with attempt count. Relative to the baseline puzzle(puzzle
-1), Puzzle 2 and Puzzle 3 exhibit large positive coefficients across all
-samples, indicating significantly higher expected attempt counts. These
-effects are statistically significant at the 1 percent level in every
-group. Puzzle 4 and Puzzle 5 also show positive associations, though
-their significance varies by sample. All these effects positive with
-respect the puzzle1, the baseline, meaning they had more attempts than
-puzzle1. The interpretation of the significant effects are as follows.
-Puzzle 2 had `r round(exp(m1_puz2_b_full),3)`% more attempts than the
-baseline puzzle in the full pool of participants,
-`r round(exp(m1_puz2_b_org),3)`% more attempts than the baseline puzzle
-in the organic participant group, and `r round(exp(m1_puz2_b_pro),3)`%
-more attempts than the baseline puzzle in the prolific participant
-group. Puzzle 3 had `r round(exp(m1_puz3_b_full),3)`% more attempts than
-the baseline puzzle in the full pool of participants,
-`r round(exp(m1_puz3_b_org),3)`% more attempts than the baseline puzzle
-in the organic participant group, and `r round(exp(m1_puz3_b_pro),3)`%
-more attempts than the baseline puzzle in the prolific participant
-group. Puzzle 4 had `r round(exp(m1_puz4_b_pro),3)`% more attempts than
-the baseline puzzle in the prolific participant group. Puzzle 5 had
-`r round(exp(m1_puz5_b_full),3)`% more attempts than the baseline puzzle
-in the full pool of participants, and `r round(exp(m1_puz5_b_pro),3)`%
-more attempts than the baseline puzzle in the prolific participant
-group.
-
-
+Puzzle identity, by contrast, consistently predicts attempt count.
+Relative to the Number Sequence (puzzle 1), the Alphabet Wheel (puzzle
+2) and Shape Sequence (puzzle 3) elicited substantially more attempts
+across all three samples, significant at the 1% level in every group. In
+the full sample, participants made
+`r round((exp(m1_puz2_b_full) - 1) * 100, 1)`% more attempts on puzzle 2
+and `r round((exp(m1_puz3_b_full) - 1) * 100, 1)`% more on puzzle 3
+relative to puzzle 1. Among organic participants, the same puzzles
+showed increases of `r round((exp(m1_puz2_b_org) - 1) * 100, 1)`% and
+`r round((exp(m1_puz3_b_org) - 1) * 100, 1)`%, and among Prolific
+participants, `r round((exp(m1_puz2_b_pro) - 1) * 100, 1)`% and
+`r round((exp(m1_puz3_b_pro) - 1) * 100, 1)`%. Puzzle 4 and puzzle 5
+also show positive associations, though significance varies by sample.
+These puzzle-level differences reflect variation in objective puzzle
+difficulty and should not be interpreted as causal — puzzle identity was
+not randomly assigned.
 
 ## Conclusion
-In conclusion, our primary mode, measuring the effect of difficulty labels on log time engaged showed that neither the hard label nor the easy label had a statistically significant effect on log time engaged relative to the no-label control in the full sample. However, the hard label is consistently negative across both subgroups s marginally significant at the 10% level. 
 
-Our secondary model for the effect of difficulty labels on zero attempt skips, showed no significant effects as well. However, it is notable that the easy label effect on zero-attempt skips is driven entirely by Prolific participants. This is likely reflects differences in how each group engages with task framing. Prolific participants are experienced study participants with a financial incentive to complete the puzzles as fast as possible. If they are told a puzzle is easy, then struggle with it, they may feel more obligated to attempt the puzzle as they know that they may not be paid for poor quality data. Our organic group had no financial incentive, so they may be more likely to skip a question they find challenging as they receive nothing regardless of data quality. 
+The primary model found no statistically significant effect of
+difficulty labels on log time engaged in the full sample. The hard label
+was consistently negative across both subgroups and marginally
+significant at the 10% level, but in the opposite direction from our
+hypothesis — participants shown the hard label spent slightly less time
+engaged, not more.
 
-Our secondary model for the effect of difficulty labels on attempt count showed that difficulty labels did not influence how many attempts
-participants made, regardless of recruitment source. However, puzzle identity consistently predicted attempt count, with some puzzles
-eliciting substantially more attempts than others. These findings indicate that puzzle‑specific features, rather than externally assigned
-difficulty labels, shape participant behavior in this task.
+The zero-attempt skip model showed a marginal effect of the easy label
+in the full sample (p = `r easy_full_p`), driven entirely by Prolific
+participants, who reduced their zero-attempt skip rate by
+`r easy_pro_pp` percentage points under the easy label (p =
+`r easy_pro_p`). This likely reflects how each group engages with task
+framing: Prolific participants are experienced study participants who
+tend to take task cues seriously and may feel more obligated to attempt
+a puzzle they were told is easy. Organic participants, with no financial
+incentive and more real-world distractions, showed no such response.
 
-All in all, our models found no significant effects for the treatment labels. We were able to find significant effects for the puzzles effect on attempt counts but these should not be interpreted as causal claims as they are not randomly assigned. If we could do this experiment again with an unlimited budget, we would like to recruit more participants, all from prolific, as our experiment was under powered. We would elect for only prolific participants as our organic participants had a higher variance in most outcomes as they were more likely to be distracted, reducing the effect of the treatment labels. 
+The exploratory attempt count model found no treatment effects across
+any sample. Puzzle identity was the dominant predictor, with some
+puzzles consistently eliciting far more attempts than others — but since
+puzzle assignment was not randomized, these are not causal estimates.
 
+Taken together, the results are inconclusive rather than null. The
+marginal signals — a negative hard label effect on time engaged and a
+reduction in cold skipping among Prolific participants shown the easy
+label — suggest that framing may matter, but we did not have enough
+precision to detect it cleanly. The easy label finding among Prolific
+participants is the most interpretable: when participants are attentive
+and motivated, telling them a puzzle is easy appears to make them less
+willing to abandon it without trying. Organic participants, more
+distracted and without a completion incentive, showed no such response.
+
+The experiment was underpowered and mixing two recruitment populations
+with very different engagement conditions inflated variance beyond what
+was anticipated. A better-powered replication using Prolific only,
+targeting `r thresh_both * 3` participants, would let us more cleanly
+test whether the easy label truly reduces cold skipping, whether the
+hard label's negative effect on engagement holds up or was noise, and
+whether the framing effects on time engaged are detectable at adequate
+power. It would also be worth testing whether the effect depends on the
+mismatch itself, specifically whether an easy label on a genuinely easy
+puzzle produces a different response than an easy label on a hard one.
 
 ## Appendix
 
